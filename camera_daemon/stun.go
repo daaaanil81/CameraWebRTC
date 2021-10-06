@@ -72,14 +72,14 @@ func (client *WebrtcConnection) ReceiveSendStunClient() error {
 
 	buffer := make([]byte, 256)
 
-	_, err := client.connectionUDP.Read(buffer)
+	_, addr, err := client.connectionUDP.ReadFromUDP(buffer)
 	if err != nil {
 		fmt.Println(err)
 
 		return err
 	}
 
-	//fmt.Println("Addr: ", addr.String())
+	fmt.Println("Addr: ", addr.String())
 
 	fmt.Printf("%s\n", hex.Dump(buffer))
 

@@ -59,25 +59,13 @@ func RandStringRunes(n int) string {
 }
 
 func (client *WebrtcConnection) OpenConnection() error {
-
 	var err error = nil
-	var our *net.UDPAddr
 
 	client.ip_local = GetOutboundIP()
 
-	for err != nil {
-		our, err = net.ResolveUDPAddr("udp", ":0")
-		if err != nil {
-			return err
-		}
-	}
-
-	client.connectionUDP, err = net.ListenUDP("udp", our)
-	if err != nil {
-		fmt.Println(err)
-
-		return err
-	}
+	client.connectionUDP, err = net.ListenUDP("udp", &net.UDPAddr{
+		IP:   net.ParseIP("0.0.0.0"),
+	})
 
 	localAddr := client.connectionUDP.LocalAddr().String()
 	index := strings.LastIndexByte(localAddr, ':')
@@ -85,7 +73,7 @@ func (client *WebrtcConnection) OpenConnection() error {
 	fmt.Println("Port Opened = ", localAddr)
 	client.port_local = localAddr[index+1:]
 
-	return nil
+	return err
 }
 
 func (client *WebrtcConnection) Init() error {
