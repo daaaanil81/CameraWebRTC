@@ -1,0 +1,17 @@
+v=0
+o=- 0 0 IN IP4 127.0.0.1
+s=Live Stream
+t=0 0
+m=video 37888 RTP/SAVP 102
+c=IN IP4 109.86.197.114
+a=rtcp:37888 IN IP4 109.86.197.114
+a=ice-ufrag:rUnQ
+a=ice-pwd:enRRTzZntUurHTsLrpdwde
+a=ice-options:trickle
+a=fingerprint:sha-256 73:2C:68:CC:BD:F1:11:9B:5B:21:8F:6D:91:B6:BA:CF:38:09:79:6E:38:47:CF:E3:86:35:ED:CD:81:F4:32:8D
+a=setup:active
+a=mid:0
+a=sendonly
+a=rtcp-mux
+a=rtpmap:102 H264/90000
+a=fmtp:102 packetization-mode=1

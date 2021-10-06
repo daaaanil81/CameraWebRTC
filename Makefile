@@ -23,6 +23,9 @@ run:
 install:
 	mkdir -p /etc/camera_server
 	cp -r $(SOURCE_DIR)/static /etc/camera_server/
+##	sudo cp $(SOURCE_DIR)/static/certificate/danil_petrov.crt /usr/local/share/ca-certificates/
+##	sudo cp $(SOURCE_DIR)/static/certificate/danil_petrov.key /usr/local/share/ca-certificates/
+##	sudo update-ca-certificates --fresh
 
 .PHONY: clean
 clean:

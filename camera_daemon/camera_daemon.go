@@ -6,10 +6,11 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"time"
 
 	"golang.org/x/net/websocket"
 )
+
+var DATABASE_PATH = "/etc/camera_server/static/database/database.txt"
 
 func loadPage(filename string) ([]byte, error) {
 	body, err := ioutil.ReadFile(filename)
@@ -20,9 +21,6 @@ func loadPage(filename string) ([]byte, error) {
 }
 
 func formHandler(w http.ResponseWriter, r *http.Request) {
-
-	var database = "/etc/camera_server/static/database/database.txt"
-
 	var name, pass string
 
 	if err := r.ParseForm(); err != nil {
@@ -30,7 +28,7 @@ func formHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var file, err = os.OpenFile(database, os.O_RDWR, 0755)
+	var file, err = os.OpenFile(DATABASE_PATH, os.O_RDWR, 0755)
 	if err != nil {
 		fmt.Println(err.Error())
 		return
@@ -59,25 +57,66 @@ func formHandler(w http.ResponseWriter, r *http.Request) {
 	w.Write(p)
 }
 
-func helloHandler(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/hello" {
-		http.Error(w, "404 not found.", http.StatusNotFound)
-		return
-	}
-
-	if r.Method != "GET" {
-		http.Error(w, "Method is not supported.", http.StatusNotFound)
-		return
-	}
-
-	fmt.Fprintf(w, "Hello!")
-}
-
 func WSClient(ws *websocket.Conn) {
-	var test string
-	websocket.Message.Receive(ws, &test)
-	time.Sleep(10 * time.Second)
-	fmt.Println(test)
+	var conn WebrtcConnection
+	var answer string
+	var err error
+
+	command := "CON"
+	flagICE := false
+	flagSDP := false
+
+	defer conn.CloseAll()
+
+	fmt.Println("Connection...")
+
+	err = conn.Init()
+	if err != nil {
+		return
+	}
+
+	err = conn.RequestStunServer()
+	if err != nil {
+		return
+	}
+
+	err = conn.ResponseStunServer()
+	if err != nil {
+		return
+	}
+
+	websocket.Message.Send(ws, command)
+
+	for flagICE == false || flagSDP == false {
+		websocket.Message.Receive(ws, &answer)
+		switch answer {
+		case "SDP": {
+			conn.ReceiveSDP(ws)
+			conn.SendSDP(ws)
+			flagSDP = true
+		}
+		case "ICE": {
+			conn.ReceiveICE(ws)
+			conn.SendICE(ws)
+			flagICE = true
+		}
+		case "ERROR":{
+			websocket.Message.Receive(ws, &answer)
+			fmt.Println(answer)
+			return
+		}
+
+		default:
+			fmt.Println("Command error")
+		}
+
+		fmt.Println("Wait...")
+	}
+
+	fmt.Println("Exchange finished")
+
+//	conn.SendReceiveStunClient()
+	conn.ReceiveSendStunClient()
 }
 
 func main() {
@@ -85,11 +124,11 @@ func main() {
 	fileServer := http.FileServer(http.Dir("/etc/camera_server/static"))
 	http.Handle("/", fileServer)
 	http.HandleFunc("/login", formHandler)
-	http.HandleFunc("/hello", helloHandler)
-	http.Handle("/ws", websocket.Handler(WSClient))
+ 	http.Handle("/ws", websocket.Handler(WSClient))
 
 	fmt.Printf("Starting server at port 8080\n")
-	if err := http.ListenAndServe(":8080", nil); err != nil {
+	if err := http.ListenAndServeTLS(":8080",
+		CRT_FILE_PATH, KEY_FILE_PATH, nil); err != nil {
 		log.Fatal(err)
 	}
 }
