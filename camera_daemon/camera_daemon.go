@@ -6,11 +6,12 @@ import (
 	"log"
 	"net/http"
 	"os"
-
+	"time"
 	"golang.org/x/net/websocket"
 )
 
 var DATABASE_PATH = "/etc/camera_server/static/database/database.txt"
+var PUBLIC_MODE bool
 
 func loadPage(filename string) ([]byte, error) {
 	body, err := ioutil.ReadFile(filename)
@@ -61,6 +62,8 @@ func WSClient(ws *websocket.Conn) {
 	var conn WebrtcConnection
 	var answer string
 	var err error
+//	socket := make(chan bool, 1)
+	done := make(chan bool, 1)
 
 	command := "CON"
 	flagICE := false
@@ -115,11 +118,20 @@ func WSClient(ws *websocket.Conn) {
 
 	fmt.Println("Exchange finished")
 
-//	conn.SendReceiveStunClient()
 	conn.ReceiveSendStunClient()
+	go conn.SendReceiveStunClient(done)
+	<- done
+
+	time.Sleep(3 * time.Second)
 }
 
 func main() {
+	mode := os.Getenv("PUBLIC_MODE")
+	if mode == "1" {
+		PUBLIC_MODE = true
+	} else {
+		PUBLIC_MODE = false
+	}
 
 	fileServer := http.FileServer(http.Dir("/etc/camera_server/static"))
 	http.Handle("/", fileServer)

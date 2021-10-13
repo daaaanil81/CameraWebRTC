@@ -1,8 +1,6 @@
 package main
 
 import (
-	"bytes"
-	"encoding/hex"
 	"fmt"
 	"net"
 	"strings"
@@ -29,7 +27,7 @@ type WebrtcConnection struct {
 	ip_client     string
 	port_client   string
 	ice_ufrag_s   string
-	ice_uflag_c   string
+	ice_ufrag_c   string
 	ice_pwd       string
 }
 
@@ -73,6 +71,8 @@ func (client *WebrtcConnection) OpenConnection() error {
 	fmt.Println("Port Opened = ", localAddr)
 	client.port_local = localAddr[index+1:]
 
+	client.connectionUDP.SetReadDeadline(time.Now().Add(time.Second * 5))
+
 	return err
 }
 
@@ -90,65 +90,6 @@ func (client *WebrtcConnection) Init() error {
 
 	client.ice_ufrag_s = RandStringRunes(4)
 	client.ice_pwd = RandStringRunes(22)
-
-	return nil
-}
-
-func (client *WebrtcConnection) RequestStunServer() error {
-
-	var err error
-	var request []byte
-	var server *net.UDPAddr
-
- 	server, err = net.ResolveUDPAddr("udp",
-		IP_STUN_SERVER+":"+PORT_STUN_SERVER)
-	if err != nil {
-		fmt.Println(err)
-
-		return err
-	}
-
-	fmt.Println("Create Addr for Stun server.")
-
-	request = CreateHeader()
-
-	fmt.Printf("%s\n", hex.Dump(request))
-
-	_, err = client.connectionUDP.WriteToUDP(request, server)
-	if err != nil {
-		fmt.Println(err)
-
-		return err
-	}
-
-	fmt.Println("Write to server successful.")
-
-	return nil
-}
-
-func (client *WebrtcConnection) ResponseStunServer() error {
-
-	var index int = 20
-
-	buffer := make([]byte, 256)
-
-	n, _, err := client.connectionUDP.ReadFromUDP(buffer)
-	if err != nil {
-		fmt.Println(err)
-
-		return err
-	}
-
-	for index < n {
-		type_attr := []byte{buffer[index], buffer[index+1]}
-
-		if bytes.Equal(type_attr, XOR_MAPPED_ADDRESS_TYPE) {
-			index = XorMappedAddress(buffer, index+HEADER_ATTRIBUTE_LENGTH,
-				&client.ip_server, &client.port_server)
-		}
-	}
-
-	fmt.Printf("%s\n", hex.Dump(buffer[0:n]))
 
 	return nil
 }
@@ -196,10 +137,17 @@ func (client *WebrtcConnection) ReceiveICE(ws *websocket.Conn) error {
 func (client *WebrtcConnection) SendICE(ws *websocket.Conn) error {
 	command := "ICE"
 
-	ice := client.CreatePublicICE()
+	ice := client.CreateLocalICE()
 
 	text := command + ice
 	websocket.Message.Send(ws, text)
+
+	if PUBLIC_MODE {
+		ice = client.CreatePublicICE()
+
+		text = command + ice
+		websocket.Message.Send(ws, text)
+	}
 
 	return nil
 }

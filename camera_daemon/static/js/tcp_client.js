@@ -18,7 +18,7 @@ var options = {
 var flag_ICE = true;
 var flag_Connection = false;
 
-//var connection = new WebSocket('wss://109.86.197.11:45000/ws');
+//var connection = new WebSocket('wss://109.86.197.114:45000/ws');
 var connection = new WebSocket('wss://127.0.0.1:8080/ws');
 
 connection.onerror = function() {
@@ -31,6 +31,7 @@ connection.onopen = function() {
 
 connection.onclose = function(event) {
     console.log("Close");
+    connectionRTC.close()
 };
 
 connection.onmessage = function(event) {

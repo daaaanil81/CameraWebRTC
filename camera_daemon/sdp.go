@@ -99,12 +99,22 @@ func (client *WebrtcConnection) CreateSDP(fingerprint string) string {
 
 	append_attribute_T(&sdpLines)
 
-	append_attribute_M(&sdpLines, client.port_server)
+	if PUBLIC_MODE {
+		append_attribute_M(&sdpLines, client.port_server)
 
-	append_attribute_C(&sdpLines, client.ip_server)
+		append_attribute_C(&sdpLines, client.ip_server)
 
-	append_attribute_A(&sdpLines, client.ip_server, client.port_server,
-		fingerprint, client.ice_ufrag_s, client.ice_pwd)
+		append_attribute_A(&sdpLines, client.ip_server, client.port_server,
+			fingerprint, client.ice_ufrag_s, client.ice_pwd)
+
+	} else {
+		append_attribute_M(&sdpLines, client.port_local)
+
+		append_attribute_C(&sdpLines, client.ip_local)
+
+		append_attribute_A(&sdpLines, client.ip_local, client.port_local,
+			fingerprint, client.ice_ufrag_s, client.ice_pwd)
+	}
 
 	sdp := strings.Join(sdpLines, "\r\n")
 

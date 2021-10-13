@@ -4,11 +4,15 @@ import (
 	"strings"
 )
 
+//candidate:3787395334 1 udp 2122260223 192.168.1.13 52653 typ host generation 0 ufrag 7NjZ network-id 1 network-cost 10
+
+//candidate:397371602 1 udp 1686052607 109.86.197.114 52653 typ srflx raddr 192.168.1.13 rport 52653 generation 0 ufrag 7NjZ network-id 1 network-cost 10
+
 var CANDIDATE = "candidate:"
 
-var FOUNDATION_public = "1968211759"
+var FOUNDATION_public = "397371602"
 
-var FOUNDATION_local = "2196157330"
+var FOUNDATION_local = "3787395334"
 
 /* component-id is a positive integer between 1 and 256 (inclusive) that
    identifies the specific component of the data stream for which this is a
@@ -21,8 +25,8 @@ var COMPONENT_ID = "1"
 var TRANSPORT = "udp"
 
 /* priority is a positive integer between 1 and (2**31 - 1) inclusive.  */
-var PRIORITY_local = "2122252543"
-var PRIORITY_public = "1677729535"
+var PRIORITY_local = "2122260223"
+var PRIORITY_public = "1686052607"
 
 /* cand-type encodes the type of candidate.
    This specification defines the values "host", "srflx", "prflx", and "relay"
@@ -33,7 +37,9 @@ var GENERATION = "generation 0"
 
 var UFRAG = "ufrag"
 
-var NETWORK_COST = "network-cost 999"
+var NETWORK_ID = "network-id 1"
+
+var NETWORK_COST = "network-cost 10"
 
 func (client *WebrtcConnection) CreatePublicICE() string {
 
@@ -44,8 +50,9 @@ func (client *WebrtcConnection) CreatePublicICE() string {
 		client.ip_server + " " +
 		client.port_server + " " +
 		"typ srflx raddr " + client.ip_local + " rport " + client.port_local + " " +
+		GENERATION + " " +
 		UFRAG + " " + client.ice_ufrag_s + " " +
-		NETWORK_COST + "\r\n"
+		NETWORK_ID + " " + NETWORK_COST
 
 	return ice
 }
@@ -59,8 +66,9 @@ func (client *WebrtcConnection) CreateLocalICE() string {
 		client.ip_local + " " +
 		client.port_local + " " +
 		CAND_TYPE + " " +
+		GENERATION + " " +
 		UFRAG + " " + client.ice_ufrag_s + " " +
-		NETWORK_COST + "\r\n"
+		NETWORK_ID + " " + NETWORK_COST
 
 	return ice
 }
@@ -73,7 +81,7 @@ func (client *WebrtcConnection) ParseICE(ice string) error {
 
 	client.ip_client = arguments[4]
 	client.port_client = arguments[5]
-	client.ice_uflag_c = arguments[15]
+	client.ice_ufrag_c = arguments[15]
 
 	return err
 }

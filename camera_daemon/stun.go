@@ -3,24 +3,47 @@ package main
 import (
 	"encoding/hex"
 	"crypto/rand"
+	"encoding/binary"
+	"crypto/sha1"
+	"hash/crc32"
+	"bytes"
 	"fmt"
 	"net"
 )
 
 var HEADER_TYPE = []byte{0x00, 0x01}
 var MAGICK = []byte{0x21, 0x12, 0xA4, 0x42}
-
-var HEADER_ATTRIBUTE_LENGTH = 4
+var HEADER_ATTRIBUTE_LENGTH uint16 = 4
 var XOR_MAPPED_ADDRESS_TYPE = []byte{0x00, 0x20}
-var XOR_MAPPED_ADDRESS_LENGTH = 0x08
+var XOR_MAPPED_ADDRESS_LENGTH = []byte{0x00, 0x08}
+var XOR_MAPPED_ADDRESS_IP4 = []byte{0x00, 0x01}
+var MESSAGE_INTEGRITY_TYPE = []byte{0x00, 0x08}
+var MESSAGE_INTEGRITY_LENGTH = []byte{0x00, 0x14}
+var FINGERPRINT_TYPE = []byte{0x80, 0x28}
+var FINGERPRINT_LENGTH = []byte{0x00, 0x04}
+var USERNAME_TYPE = []byte{0x00, 0x06}
+var USERNAME_LENGTH = []byte{0x00, 0x09}
+var PADDING uint16 = 3
+var ICE_CONTROLLED_TYPE = []byte{0x80, 0x29}
+var ICE_CONTROLLED_LENGTH = []byte{0x00, 0x08}
+var PRIORITY_TYPE = []byte{0x00, 0x24}
+var PRIORITY_LENGTH = []byte{0x00, 0x04}
+var PRIORITY_VALUE uint32 = 1853817087
 
-func CreateHeader() []byte {
+func CreateHeader(transaction []byte) []byte {
 	var request []byte
-	transaction := make([]byte, 12)
+	var header []byte
 
-	rand.Read(transaction)
+	header = append(header, HEADER_TYPE...)
 
-	request = append(request, HEADER_TYPE...)
+	if len(transaction) == 0 {
+		transaction = make([]byte, 12)
+		rand.Read(transaction)
+	} else {
+		header[0] = 0x01
+	}
+
+	request = append(request, header...)
 	request = append(request, 0, 0)
 	request = append(request, MAGICK...)
 	request = append(request, transaction...)
@@ -28,7 +51,7 @@ func CreateHeader() []byte {
 	return request
 }
 
-func XorMappedAddress(buf []byte, index int, ip, port *string) int {
+func XorMappedAddressDecode(buf []byte, index uint16, ip, port *string) uint16 {
 	family := uint8(buf[index+1])
 	*ip = fmt.Sprintf("%d.%d.%d.%d", buf[index+4]^MAGICK[0], buf[index+5]^MAGICK[1],
 		buf[index+6]^MAGICK[2], buf[index+7]^MAGICK[3])
@@ -39,22 +62,237 @@ func XorMappedAddress(buf []byte, index int, ip, port *string) int {
 	fmt.Printf("IP: %s\n", *ip)
 	fmt.Printf("Port: %s\n", *port)
 
-	return index + XOR_MAPPED_ADDRESS_LENGTH
+	return index + binary.LittleEndian.Uint16(XOR_MAPPED_ADDRESS_LENGTH)
 }
 
-func (client *WebrtcConnection) SendReceiveStunClient() error {
+func (client *WebrtcConnection) RequestStunServer() error {
 
-	browserAddr, err := net.ResolveUDPAddr("udp4",
-		client.ip_client+":"+client.port_client)
+	var err error
+	var request []byte
+	var server *net.UDPAddr
+	var transaction []byte
+
+ 	server, err = net.ResolveUDPAddr("udp",
+		IP_STUN_SERVER+":"+PORT_STUN_SERVER)
 	if err != nil {
 		fmt.Println(err)
 
 		return err
 	}
 
+	fmt.Println("Create Addr for Stun server.")
+
+	request = CreateHeader(transaction)
+
+	fmt.Printf("%s\n", hex.Dump(request))
+
+	_, err = client.connectionUDP.WriteToUDP(request, server)
+	if err != nil {
+		fmt.Println(err)
+
+		return err
+	}
+
+	fmt.Println("Write to server successful.")
+
+	return nil
+}
+
+func (client *WebrtcConnection) ResponseStunServer() error {
+
+	var index uint16 = 20
+
+	buffer := make([]byte, 256)
+
+	n, _, err := client.connectionUDP.ReadFromUDP(buffer)
+	if err != nil {
+		fmt.Println(err)
+
+		return err
+	}
+
+	for index < uint16(n) {
+		type_attr := []byte{buffer[index], buffer[index+1]}
+
+		if bytes.Equal(type_attr, XOR_MAPPED_ADDRESS_TYPE) {
+			index = XorMappedAddressDecode(buffer, index+HEADER_ATTRIBUTE_LENGTH,
+				&client.ip_server, &client.port_server)
+		}
+	}
+
+	fmt.Printf("%s\n", hex.Dump(buffer[0:n]))
+
+	return nil
+}
+
+func ParseRequestStun(stunRequest []byte) []byte {
+	transaction := stunRequest[8:20]
+
+	return transaction
+}
+
+func stun_xor_mapped(addr net.UDPAddr, body []byte) []byte {
+	var response []byte
+
+	ip := make([]byte, 4)
+	port := make([]byte, 2)
+
+    binary.BigEndian.PutUint16(port, uint16(addr.Port))
+
+	for i := 0; i < 4; i++ {
+		ip[i] = addr.IP[12+i] ^ MAGICK[i]
+	}
+
+	for i := 0; i < 2; i++ {
+		port[i] = port[i] ^ MAGICK[i]
+	}
+
+	response = append(response, XOR_MAPPED_ADDRESS_TYPE...)
+	response = append(response, XOR_MAPPED_ADDRESS_LENGTH...)
+	response = append(response, XOR_MAPPED_ADDRESS_IP4...)
+	response = append(response, port...)
+	response = append(response, ip...)
+
+	length := binary.BigEndian.Uint16(body[2:4])
+	length += binary.BigEndian.Uint16(XOR_MAPPED_ADDRESS_LENGTH)
+	length += HEADER_ATTRIBUTE_LENGTH
+	binary.BigEndian.PutUint16(body[2:4], length)
+
+	body = append(body, response...)
+
+	return body
+}
+
+func stun_message_integrity(body []byte) []byte {
+	var response []byte
+
+	length := binary.BigEndian.Uint16(body[2:4])
+	length += binary.BigEndian.Uint16(MESSAGE_INTEGRITY_LENGTH)
+	length += HEADER_ATTRIBUTE_LENGTH
+	binary.BigEndian.PutUint16(body[2:4], length)
+
+	hash := sha1.Sum(body)
+
+	response = append(response, MESSAGE_INTEGRITY_TYPE...)
+	response = append(response, MESSAGE_INTEGRITY_LENGTH...)
+	response = append(response, hash[:]...)
+
+	body = append(body, response...)
+
+	return body
+}
+
+func stun_fingerprint(body []byte) []byte {
+	var response []byte
+	crc := make([]byte, 4)
+
+	length := binary.BigEndian.Uint16(body[2:4])
+	length += binary.BigEndian.Uint16(FINGERPRINT_LENGTH)
+	length += HEADER_ATTRIBUTE_LENGTH
+	binary.BigEndian.PutUint16(body[2:4], length)
+
+	binary.BigEndian.PutUint32(crc, crc32.ChecksumIEEE(body))
+
+	response = append(response, FINGERPRINT_TYPE...)
+	response = append(response, FINGERPRINT_LENGTH...)
+	response = append(response, crc[:]...)
+
+	body = append(body, response...)
+
+	return body
+}
+
+func stun_username(ufrag_s, ufrag_c string, body []byte) []byte {
+	var response []byte
+
+	length := binary.BigEndian.Uint16(body[2:4])
+	length += binary.BigEndian.Uint16(USERNAME_LENGTH)
+	length += HEADER_ATTRIBUTE_LENGTH + PADDING
+	binary.BigEndian.PutUint16(body[2:4], length)
+
+	username := ufrag_c + ":" + ufrag_s
+
+	response = append(response, USERNAME_TYPE...)
+	response = append(response, USERNAME_LENGTH...)
+	response = append(response, username...)
+	response = append(response, 0, 0, 0)
+
+	body = append(body, response...)
+
+	return body
+}
+
+func stun_controlled(body []byte) []byte {
+	var response []byte
+
+	length := binary.BigEndian.Uint16(body[2:4])
+	length += binary.BigEndian.Uint16(ICE_CONTROLLED_LENGTH)
+	length += HEADER_ATTRIBUTE_LENGTH
+	binary.BigEndian.PutUint16(body[2:4], length)
+
+	data := make([]byte, ICE_CONTROLLED_LENGTH[1])
+	rand.Read(data)
+
+	response = append(response, ICE_CONTROLLED_TYPE...)
+	response = append(response, ICE_CONTROLLED_LENGTH...)
+	response = append(response, data...)
+
+	body = append(body, response...)
+
+	return body
+}
+
+func stun_priority(body []byte) []byte {
+	var response []byte
+
+	length := binary.BigEndian.Uint16(body[2:4])
+	length += binary.BigEndian.Uint16(PRIORITY_LENGTH)
+	length += HEADER_ATTRIBUTE_LENGTH
+	binary.BigEndian.PutUint16(body[2:4], length)
+
+	data := make([]byte, PRIORITY_LENGTH[1])
+	binary.BigEndian.PutUint32(data, PRIORITY_VALUE)
+
+	response = append(response, PRIORITY_TYPE...)
+	response = append(response, PRIORITY_LENGTH...)
+	response = append(response, data...)
+
+	body = append(body, response...)
+
+	return body
+}
+
+func (client *WebrtcConnection) SendReceiveStunClient(done chan bool) {
+	var transaction []byte
+	var request []byte
+	var ip, port string
+	var n int
+
+	buffer := make([]byte, 256)
+
+	if PUBLIC_MODE {
+		ip = client.ip_client
+	} else {
+		ip = client.ip_local
+	}
+
+	port = client.port_client
+
+	browserAddr, err := net.ResolveUDPAddr("udp", ip+":"+port)
+	if err != nil {
+		fmt.Println(err)
+
+		goto EXIT
+	}
+
 	fmt.Println("Create Addr for browser.")
 
-	request := CreateHeader()
+	request = CreateHeader(transaction)
+	request = stun_username(client.ice_ufrag_s, client.ice_ufrag_c, request)
+	request = stun_controlled(request)
+	request = stun_priority(request)
+	request = stun_message_integrity(request)
+	request = stun_fingerprint(request)
 
 	fmt.Printf("%s\n", hex.Dump(request))
 
@@ -62,26 +300,58 @@ func (client *WebrtcConnection) SendReceiveStunClient() error {
 	if err != nil {
 		fmt.Println(err)
 
-		return err
+		goto EXIT
 	}
 
-	return nil
-}
-
-func (client *WebrtcConnection) ReceiveSendStunClient() error {
-
-	buffer := make([]byte, 256)
-
-	_, addr, err := client.connectionUDP.ReadFromUDP(buffer)
+	n, browserAddr, err = client.connectionUDP.ReadFromUDP(buffer)
 	if err != nil {
 		fmt.Println(err)
 
-		return err
+		goto EXIT
 	}
 
-	fmt.Println("Addr: ", addr.String())
+	fmt.Printf("%s\n", hex.Dump(buffer[:n]))
 
-	fmt.Printf("%s\n", hex.Dump(buffer))
+EXIT:
+	done <- true
+	return
+}
 
-	return nil
+func (client *WebrtcConnection) ReceiveSendStunClient() {
+	var response []byte
+	var transaction []byte
+
+	buffer := make([]byte, 256)
+
+	n, browserAddr, err := client.connectionUDP.ReadFromUDP(buffer)
+	if err != nil {
+		fmt.Println(err)
+
+		goto EXIT
+	}
+
+	fmt.Println("BrowserAddr: ", browserAddr.String())
+
+	fmt.Printf("%s\n", hex.Dump(buffer[:n]))
+
+	transaction = ParseRequestStun(buffer)
+	response = CreateHeader(transaction)
+	response = stun_xor_mapped(*browserAddr, response)
+	response = stun_message_integrity(response)
+	response = stun_fingerprint(response)
+
+	fmt.Printf("%s\n", hex.Dump(response))
+
+	fmt.Println("BrowserAddr: ", browserAddr.String())
+
+	_, err = client.connectionUDP.WriteToUDP(response, browserAddr)
+	if err != nil {
+		fmt.Println(err)
+
+		goto EXIT
+	}
+
+EXIT:
+//	done <- true
+	return
 }
