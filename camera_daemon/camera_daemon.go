@@ -118,10 +118,8 @@ func WSClient(ws *websocket.Conn) {
 
 	fmt.Println("Exchange finished")
 
-	conn.ReceiveSendStunClient()
-	go conn.SendReceiveStunClient(done)
+	conn.MessageController(done)
 	<- done
-
 	time.Sleep(3 * time.Second)
 }
 

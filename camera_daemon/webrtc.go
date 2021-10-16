@@ -7,6 +7,8 @@ import (
 	"crypto/x509"
 	"math/rand"
 	"time"
+	"bytes"
+	"encoding/hex"
 
 	"golang.org/x/net/websocket"
 )
@@ -16,6 +18,10 @@ var IP_STUN_SERVER string = "108.177.15.127"
 var PORT_STUN_SERVER string = "19302"
 
 var last_port = 30000
+
+var STUN_RESPONSE = []byte{0x01, 0x01}
+var STUN_REQUEST = []byte{0x00, 0x01}
+var RTP_MESSAGE = []byte{0x80, 0x00}
 
 type WebrtcConnection struct {
 	connectionUDP *net.UDPConn
@@ -150,6 +156,53 @@ func (client *WebrtcConnection) SendICE(ws *websocket.Conn) error {
 	}
 
 	return nil
+}
+
+func (client *WebrtcConnection) MessageController(done chan bool) {
+
+	buffer := make([]byte, 256)
+
+	for {
+		n, browserAddr, err := client.connectionUDP.ReadFromUDP(buffer)
+		if err != nil {
+			fmt.Println(err)
+
+			break
+		}
+
+		message := buffer[:n]
+		fmt.Println("Receive INFO")
+		fmt.Println("BrowserAddr: ", browserAddr.String())
+		if bytes.Equal(message[0:2], STUN_REQUEST) {
+			fmt.Println("Receive STUN Request\n")
+			fmt.Printf("%s\n", hex.Dump(message))
+
+			err = client.SendResponse(message, browserAddr)
+			if err != nil {
+				fmt.Println(err)
+
+				break
+			}
+
+			err = client.SendRequest()
+			if err != nil {
+				fmt.Println(err)
+
+				break
+			}
+
+		} else if bytes.Equal(message[0:2], STUN_RESPONSE) {
+			fmt.Println("Receive STUN Response\n")
+			fmt.Printf("%s\n", hex.Dump(message))
+
+			client.ReceiveResponse(message)
+		} else if bytes.Equal(message[0:2], RTP_MESSAGE){
+			fmt.Println("Receive RTP\n")
+			fmt.Printf("%s\n", hex.Dump(message))
+		}
+	}
+
+	done <- true
 }
 
 func (client *WebrtcConnection) CloseAll() {

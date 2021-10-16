@@ -21,6 +21,7 @@ var MESSAGE_INTEGRITY_TYPE = []byte{0x00, 0x08}
 var MESSAGE_INTEGRITY_LENGTH = []byte{0x00, 0x14}
 var FINGERPRINT_TYPE = []byte{0x80, 0x28}
 var FINGERPRINT_LENGTH = []byte{0x00, 0x04}
+var FINGERPRINT uint32 = 0x5354554e
 var USERNAME_TYPE = []byte{0x00, 0x06}
 var USERNAME_LENGTH = []byte{0x00, 0x09}
 var PADDING uint16 = 3
@@ -29,6 +30,8 @@ var ICE_CONTROLLED_LENGTH = []byte{0x00, 0x08}
 var PRIORITY_TYPE = []byte{0x00, 0x24}
 var PRIORITY_LENGTH = []byte{0x00, 0x04}
 var PRIORITY_VALUE uint32 = 1853817087
+var SOFTWARE_TYPE = []byte{0x80, 0x22}
+var SOFTWARE_VALUE = "webrtpstream-1.0.0"
 
 func CreateHeader(transaction []byte) []byte {
 	var request []byte
@@ -191,7 +194,8 @@ func stun_fingerprint(body []byte) []byte {
 	length += HEADER_ATTRIBUTE_LENGTH
 	binary.BigEndian.PutUint16(body[2:4], length)
 
-	binary.BigEndian.PutUint32(crc, crc32.ChecksumIEEE(body))
+	num := crc32.ChecksumIEEE(body) ^ FINGERPRINT
+	binary.BigEndian.PutUint32(crc, num)
 
 	response = append(response, FINGERPRINT_TYPE...)
 	response = append(response, FINGERPRINT_LENGTH...)
@@ -262,13 +266,38 @@ func stun_priority(body []byte) []byte {
 	return body
 }
 
-func (client *WebrtcConnection) SendReceiveStunClient(done chan bool) {
+func stun_software(body []byte) []byte {
+	var response []byte
+	len_b := make([]byte, 2)
+	length_str := uint16(len(SOFTWARE_VALUE))
+	var i uint16 = 0
+	var size uint16 = (length_str + 3) & 0xfffc;
+
+
+	length := binary.BigEndian.Uint16(body[2:4])
+	length += size
+	length += HEADER_ATTRIBUTE_LENGTH
+	binary.BigEndian.PutUint16(body[2:4], length)
+	binary.BigEndian.PutUint16(len_b, size)
+
+
+	response = append(response, SOFTWARE_TYPE...)
+	response = append(response, len_b...)
+	response = append(response, SOFTWARE_VALUE...)
+
+	for ; i < size - length_str; i++ {
+		response = append(response, 0)
+	}
+
+	body = append(body, response...)
+
+	return body
+}
+
+func (client *WebrtcConnection) SendRequest() error {
 	var transaction []byte
 	var request []byte
 	var ip, port string
-	var n int
-
-	buffer := make([]byte, 256)
 
 	if PUBLIC_MODE {
 		ip = client.ip_client
@@ -282,12 +311,13 @@ func (client *WebrtcConnection) SendReceiveStunClient(done chan bool) {
 	if err != nil {
 		fmt.Println(err)
 
-		goto EXIT
+		return err
 	}
 
-	fmt.Println("Create Addr for browser.")
+	fmt.Println("Create STUN Request.")
 
 	request = CreateHeader(transaction)
+	request = stun_software(request)
 	request = stun_username(client.ice_ufrag_s, client.ice_ufrag_c, request)
 	request = stun_controlled(request)
 	request = stun_priority(request)
@@ -300,39 +330,35 @@ func (client *WebrtcConnection) SendReceiveStunClient(done chan bool) {
 	if err != nil {
 		fmt.Println(err)
 
-		goto EXIT
+		return err
 	}
 
-	n, browserAddr, err = client.connectionUDP.ReadFromUDP(buffer)
-	if err != nil {
-		fmt.Println(err)
-
-		goto EXIT
-	}
-
-	fmt.Printf("%s\n", hex.Dump(buffer[:n]))
-
-EXIT:
-	done <- true
-	return
+	return err
 }
 
-func (client *WebrtcConnection) ReceiveSendStunClient() {
+func (client *WebrtcConnection) ReceiveResponse(buffer []byte) {
+	var index uint16 = 20
+
+	var ip string
+	var port string
+
+	type_attr := []byte{buffer[index], buffer[index+1]}
+
+	if bytes.Equal(type_attr, XOR_MAPPED_ADDRESS_TYPE) {
+		index = XorMappedAddressDecode(buffer, index+HEADER_ATTRIBUTE_LENGTH,
+			&ip, &port)
+	}
+
+	fmt.Printf("Address from response: %s:%s\n", ip, port)
+}
+
+func (client *WebrtcConnection) SendResponse(buffer []byte,
+	browserAddr *net.UDPAddr) error {
+
 	var response []byte
 	var transaction []byte
 
-	buffer := make([]byte, 256)
-
-	n, browserAddr, err := client.connectionUDP.ReadFromUDP(buffer)
-	if err != nil {
-		fmt.Println(err)
-
-		goto EXIT
-	}
-
-	fmt.Println("BrowserAddr: ", browserAddr.String())
-
-	fmt.Printf("%s\n", hex.Dump(buffer[:n]))
+	fmt.Println("Create STUN Response.")
 
 	transaction = ParseRequestStun(buffer)
 	response = CreateHeader(transaction)
@@ -342,16 +368,10 @@ func (client *WebrtcConnection) ReceiveSendStunClient() {
 
 	fmt.Printf("%s\n", hex.Dump(response))
 
-	fmt.Println("BrowserAddr: ", browserAddr.String())
-
-	_, err = client.connectionUDP.WriteToUDP(response, browserAddr)
+	_, err := client.connectionUDP.WriteToUDP(response, browserAddr)
 	if err != nil {
 		fmt.Println(err)
-
-		goto EXIT
 	}
 
-EXIT:
-//	done <- true
-	return
+	return err
 }
