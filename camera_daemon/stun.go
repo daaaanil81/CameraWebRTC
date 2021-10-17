@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"crypto/sha1"
+	"crypto/hmac"
 	"hash/crc32"
 	"bytes"
 	"fmt"
@@ -166,7 +167,7 @@ func stun_xor_mapped(addr net.UDPAddr, body []byte) []byte {
 	return body
 }
 
-func stun_message_integrity(body []byte) []byte {
+func stun_message_integrity(body []byte, pwd string) []byte {
 	var response []byte
 
 	length := binary.BigEndian.Uint16(body[2:4])
@@ -174,11 +175,15 @@ func stun_message_integrity(body []byte) []byte {
 	length += HEADER_ATTRIBUTE_LENGTH
 	binary.BigEndian.PutUint16(body[2:4], length)
 
-	hash := sha1.Sum(body)
+//	hash := sha1.Sum(body)
+
+	key := []byte(pwd)
+	h := hmac.New(sha1.New, key)
+	h.Write([]byte(body))
 
 	response = append(response, MESSAGE_INTEGRITY_TYPE...)
 	response = append(response, MESSAGE_INTEGRITY_LENGTH...)
-	response = append(response, hash[:]...)
+	response = append(response, h.Sum(nil)...)
 
 	body = append(body, response...)
 
@@ -294,6 +299,26 @@ func stun_software(body []byte) []byte {
 	return body
 }
 
+func check_message_integrity(body []byte, pwd string) {
+	size := len(body) - 8 - 4 - 20
+	var message []byte = make([]byte, len(body) - 8 - 4 - 20)
+
+	copy(message, body[:size])
+
+	length := binary.BigEndian.Uint16(message[2:4])
+	length -= binary.BigEndian.Uint16(FINGERPRINT_LENGTH)
+	length -= HEADER_ATTRIBUTE_LENGTH
+	binary.BigEndian.PutUint16(message[2:4], length)
+
+//	hash := sha1.Sum(body)
+
+	key := []byte(pwd)
+	h := hmac.New(sha1.New, key)
+	h.Write([]byte(message))
+
+//	fmt.Printf("%s\n", hex.Dump(h.Sum(nil)))
+}
+
 func (client *WebrtcConnection) SendRequest() error {
 	var transaction []byte
 	var request []byte
@@ -321,7 +346,7 @@ func (client *WebrtcConnection) SendRequest() error {
 	request = stun_username(client.ice_ufrag_s, client.ice_ufrag_c, request)
 	request = stun_controlled(request)
 	request = stun_priority(request)
-	request = stun_message_integrity(request)
+	request = stun_message_integrity(request, client.ice_pwd_c)
 	request = stun_fingerprint(request)
 
 	fmt.Printf("%s\n", hex.Dump(request))
@@ -360,10 +385,12 @@ func (client *WebrtcConnection) SendResponse(buffer []byte,
 
 	fmt.Println("Create STUN Response.")
 
+	check_message_integrity(buffer, client.ice_pwd_s)
+
 	transaction = ParseRequestStun(buffer)
 	response = CreateHeader(transaction)
 	response = stun_xor_mapped(*browserAddr, response)
-	response = stun_message_integrity(response)
+	response = stun_message_integrity(response, client.ice_pwd_c)
 	response = stun_fingerprint(response)
 
 	fmt.Printf("%s\n", hex.Dump(response))

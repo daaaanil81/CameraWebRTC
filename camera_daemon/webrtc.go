@@ -13,15 +13,15 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-var IP_STUN_SERVER string = "108.177.15.127"
-
-var PORT_STUN_SERVER string = "19302"
-
-var last_port = 30000
-
-var STUN_RESPONSE = []byte{0x01, 0x01}
-var STUN_REQUEST = []byte{0x00, 0x01}
-var RTP_MESSAGE = []byte{0x80, 0x00}
+var (
+	IP_STUN_SERVER string = "108.177.15.127"
+	PORT_STUN_SERVER string = "19302"
+	last_port = 30000
+	STUN_RESPONSE = []byte{0x01, 0x01}
+	STUN_REQUEST = []byte{0x00, 0x01}
+	RTP_MESSAGE = []byte{0x80, 0x00}
+	BAD_RESULT = -1
+)
 
 type WebrtcConnection struct {
 	connectionUDP *net.UDPConn
@@ -34,7 +34,8 @@ type WebrtcConnection struct {
 	port_client   string
 	ice_ufrag_s   string
 	ice_ufrag_c   string
-	ice_pwd       string
+	ice_pwd_s     string
+	ice_pwd_c     string
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -95,7 +96,7 @@ func (client *WebrtcConnection) Init() error {
 	}
 
 	client.ice_ufrag_s = RandStringRunes(4)
-	client.ice_pwd = RandStringRunes(22)
+	client.ice_pwd_s = RandStringRunes(22)
 
 	return nil
 }
@@ -104,6 +105,8 @@ func (client *WebrtcConnection) ReceiveSDP(ws *websocket.Conn) error {
 	var answer string
 
 	websocket.Message.Receive(ws, &answer)
+
+	client.parseSDP(answer)
 
 	fmt.Printf("SDP: \n%s\n", answer)
 

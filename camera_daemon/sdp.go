@@ -2,6 +2,8 @@ package main
 
 import (
 	"strings"
+	"fmt"
+	"errors"
 )
 
 var SDP_PATH = "/etc/camera_server/camera.sdp"
@@ -35,6 +37,8 @@ var ATTRIBUTE_A_RTPMAP = "a=rtpmap:" + ATTRIBUTE_M_PAYLOAD_102 + " H264/90000"
 var ATTRIBUTE_A_FMTP = "a=fmtp:" + ATTRIBUTE_M_PAYLOAD_102 +
 	" packetization-mode=1"
 
+var END_LINE = "\r\n"
+
 func append_attribute_V(sdpLines *[]string) {
 	*sdpLines = append(*sdpLines, ATTRIBUTE_V)
 }
@@ -64,7 +68,7 @@ func append_attribute_C(sdpLines *[]string, ip string) {
 }
 
 func append_attribute_A(sdpLines *[]string, ip, port,
-	fingerprint, ice_ufrag, ice_pwd string) {
+	fingerprint, ice_ufrag, ice_pwd_s string) {
 
 	line := ATTRIBUTE_A_RTCP + port + " " + ATTRIBUTE_A_RTCP_IP4 + " " + ip
 
@@ -73,7 +77,7 @@ func append_attribute_A(sdpLines *[]string, ip, port,
 	line = ATTRIBUTE_A_ICE_UFRAG + ice_ufrag
 	*sdpLines = append(*sdpLines, line)
 
-	line = ATTRIBUTE_A_ICE_PWD + ice_pwd
+	line = ATTRIBUTE_A_ICE_PWD + ice_pwd_s
 	*sdpLines = append(*sdpLines, line)
 
 	*sdpLines = append(*sdpLines, ATTRIBUTE_A_ICE_OPTIONS)
@@ -105,7 +109,7 @@ func (client *WebrtcConnection) CreateSDP(fingerprint string) string {
 		append_attribute_C(&sdpLines, client.ip_server)
 
 		append_attribute_A(&sdpLines, client.ip_server, client.port_server,
-			fingerprint, client.ice_ufrag_s, client.ice_pwd)
+			fingerprint, client.ice_ufrag_s, client.ice_pwd_s)
 
 	} else {
 		append_attribute_M(&sdpLines, client.port_local)
@@ -113,12 +117,34 @@ func (client *WebrtcConnection) CreateSDP(fingerprint string) string {
 		append_attribute_C(&sdpLines, client.ip_local)
 
 		append_attribute_A(&sdpLines, client.ip_local, client.port_local,
-			fingerprint, client.ice_ufrag_s, client.ice_pwd)
+			fingerprint, client.ice_ufrag_s, client.ice_pwd_s)
 	}
 
-	sdp := strings.Join(sdpLines, "\r\n")
+	sdp := strings.Join(sdpLines, END_LINE)
 
-	sdp += "\r\n"
+	sdp += END_LINE
 
 	return sdp
+}
+
+func (client *WebrtcConnection) parseSDP(client_sdp string) error {
+	start := strings.Index(client_sdp, ATTRIBUTE_A_ICE_PWD)
+	if start == -1 {
+		fmt.Println("Don't found '" + ATTRIBUTE_A_ICE_PWD + "'")
+
+		return errors.New("Don't found '" + ATTRIBUTE_A_ICE_PWD + "'")
+	}
+
+	end := strings.Index(client_sdp[start:], END_LINE)
+	if end == -1 {
+		fmt.Println("Don't found '" + END_LINE + "'")
+
+		return errors.New("Don't found '" + END_LINE + "'")
+	}
+
+	client.ice_pwd_c = client_sdp[start+len(ATTRIBUTE_A_ICE_PWD):start+end]
+
+	fmt.Println("ICE_PWD of client: ", client.ice_pwd_c)
+
+	return nil
 }
