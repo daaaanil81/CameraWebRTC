@@ -75,6 +75,8 @@ func WSClient(ws *websocket.Conn) {
 
 	defer conn.CloseAll()
 
+	SetupCloseHandler(&conn)
+
 	fmt.Println("Connection...")
 
 	err = conn.Init()
@@ -122,7 +124,7 @@ func WSClient(ws *websocket.Conn) {
 
 	fmt.Println("Exchange finished")
 
-	conn.MessageController(done)
+	go conn.MessageController(done)
 	<- done
 	time.Sleep(3 * time.Second)
 }

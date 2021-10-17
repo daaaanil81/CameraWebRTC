@@ -42,7 +42,6 @@ func (client *WebrtcConnection) OpenCert() error {
 func FingerPrintCertificate(cert *x509.Certificate) string {
 	var buf bytes.Buffer
 
-
 	if cert == nil {
 		fmt.Printf("Bad certificate\n")
 

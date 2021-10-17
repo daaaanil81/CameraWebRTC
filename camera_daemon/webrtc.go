@@ -7,6 +7,9 @@ import (
 	"crypto/x509"
 	"math/rand"
 	"time"
+	"os"
+	"os/signal"
+	"syscall"
 	"bytes"
 	"encoding/hex"
 
@@ -78,7 +81,7 @@ func (client *WebrtcConnection) OpenConnection() error {
 	fmt.Println("Port Opened = ", localAddr)
 	client.port_local = localAddr[index+1:]
 
-	client.connectionUDP.SetReadDeadline(time.Now().Add(time.Second * 5))
+//	client.connectionUDP.SetReadDeadline(time.Now().Add(time.Second * 5))
 
 	return err
 }
@@ -209,7 +212,17 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 }
 
 func (client *WebrtcConnection) CloseAll() {
-
-	fmt.Println("Closing socket")
+	fmt.Println("Closing socket " + client.connectionUDP.LocalAddr().String())
 	client.connectionUDP.Close()
+}
+
+func SetupCloseHandler(client *WebrtcConnection) {
+	c := make(chan os.Signal)
+	signal.Notify(c, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-c
+		client.CloseAll()
+		fmt.Println("\r- Ctrl+C pressed in Terminal")
+		os.Exit(0)
+	}()
 }
