@@ -10,8 +10,10 @@ import (
 	"golang.org/x/net/websocket"
 )
 
-var DATABASE_PATH = "/etc/camera_server/static/database/database.txt"
-var PUBLIC_MODE bool
+var (
+	DATABASE_PATH = "/etc/camera_server/static/database/database.txt"
+	PUBLIC_MODE bool
+)
 
 func loadPage(filename string) ([]byte, error) {
 	body, err := ioutil.ReadFile(filename)
@@ -59,10 +61,12 @@ func formHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func WSClient(ws *websocket.Conn) {
-	var conn WebrtcConnection
-	var answer string
-	var err error
-//	socket := make(chan bool, 1)
+	var (
+		conn WebrtcConnection
+		answer string
+		err error
+	)
+
 	done := make(chan bool, 1)
 
 	command := "CON"

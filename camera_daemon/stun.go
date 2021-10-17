@@ -12,31 +12,35 @@ import (
 	"net"
 )
 
-var HEADER_TYPE = []byte{0x00, 0x01}
-var MAGICK = []byte{0x21, 0x12, 0xA4, 0x42}
-var HEADER_ATTRIBUTE_LENGTH uint16 = 4
-var XOR_MAPPED_ADDRESS_TYPE = []byte{0x00, 0x20}
-var XOR_MAPPED_ADDRESS_LENGTH = []byte{0x00, 0x08}
-var XOR_MAPPED_ADDRESS_IP4 = []byte{0x00, 0x01}
-var MESSAGE_INTEGRITY_TYPE = []byte{0x00, 0x08}
-var MESSAGE_INTEGRITY_LENGTH = []byte{0x00, 0x14}
-var FINGERPRINT_TYPE = []byte{0x80, 0x28}
-var FINGERPRINT_LENGTH = []byte{0x00, 0x04}
-var FINGERPRINT uint32 = 0x5354554e
-var USERNAME_TYPE = []byte{0x00, 0x06}
-var USERNAME_LENGTH = []byte{0x00, 0x09}
-var PADDING uint16 = 3
-var ICE_CONTROLLED_TYPE = []byte{0x80, 0x29}
-var ICE_CONTROLLED_LENGTH = []byte{0x00, 0x08}
-var PRIORITY_TYPE = []byte{0x00, 0x24}
-var PRIORITY_LENGTH = []byte{0x00, 0x04}
-var PRIORITY_VALUE uint32 = 1853817087
-var SOFTWARE_TYPE = []byte{0x80, 0x22}
-var SOFTWARE_VALUE = "webrtpstream-1.0.0"
+var (
+	HEADER_TYPE = []byte{0x00, 0x01}
+	MAGICK = []byte{0x21, 0x12, 0xA4, 0x42}
+	HEADER_ATTRIBUTE_LENGTH uint16 = 4
+	XOR_MAPPED_ADDRESS_TYPE = []byte{0x00, 0x20}
+	XOR_MAPPED_ADDRESS_LENGTH = []byte{0x00, 0x08}
+	XOR_MAPPED_ADDRESS_IP4 = []byte{0x00, 0x01}
+	MESSAGE_INTEGRITY_TYPE = []byte{0x00, 0x08}
+	MESSAGE_INTEGRITY_LENGTH = []byte{0x00, 0x14}
+	FINGERPRINT_TYPE = []byte{0x80, 0x28}
+	FINGERPRINT_LENGTH = []byte{0x00, 0x04}
+	FINGERPRINT uint32 = 0x5354554e
+	USERNAME_TYPE = []byte{0x00, 0x06}
+	USERNAME_LENGTH = []byte{0x00, 0x09}
+	PADDING uint16 = 3
+	ICE_CONTROLLED_TYPE = []byte{0x80, 0x29}
+	ICE_CONTROLLED_LENGTH = []byte{0x00, 0x08}
+	PRIORITY_TYPE = []byte{0x00, 0x24}
+	PRIORITY_LENGTH = []byte{0x00, 0x04}
+	PRIORITY_VALUE uint32 = 1853817087
+	SOFTWARE_TYPE = []byte{0x80, 0x22}
+	SOFTWARE_VALUE = "webrtpstream-1.0.0"
+)
 
 func CreateHeader(transaction []byte) []byte {
-	var request []byte
-	var header []byte
+	var (
+		request []byte
+		header []byte
+	)
 
 	header = append(header, HEADER_TYPE...)
 
@@ -70,11 +74,12 @@ func XorMappedAddressDecode(buf []byte, index uint16, ip, port *string) uint16 {
 }
 
 func (client *WebrtcConnection) RequestStunServer() error {
-
-	var err error
-	var request []byte
-	var server *net.UDPAddr
-	var transaction []byte
+	var (
+		err error
+		request []byte
+		server *net.UDPAddr
+		transaction []byte
+	)
 
  	server, err = net.ResolveUDPAddr("udp",
 		IP_STUN_SERVER+":"+PORT_STUN_SERVER)
@@ -175,8 +180,6 @@ func stun_message_integrity(body []byte, pwd string) []byte {
 	length += HEADER_ATTRIBUTE_LENGTH
 	binary.BigEndian.PutUint16(body[2:4], length)
 
-//	hash := sha1.Sum(body)
-
 	key := []byte(pwd)
 	h := hmac.New(sha1.New, key)
 	h.Write([]byte(body))
@@ -272,12 +275,14 @@ func stun_priority(body []byte) []byte {
 }
 
 func stun_software(body []byte) []byte {
-	var response []byte
 	len_b := make([]byte, 2)
 	length_str := uint16(len(SOFTWARE_VALUE))
-	var i uint16 = 0
-	var size uint16 = (length_str + 3) & 0xfffc;
 
+	var (
+		response []byte
+		i uint16 = 0
+		size uint16 = (length_str + 3) & 0xfffc;
+	)
 
 	length := binary.BigEndian.Uint16(body[2:4])
 	length += size
@@ -301,7 +306,7 @@ func stun_software(body []byte) []byte {
 
 func check_message_integrity(body []byte, pwd string) {
 	size := len(body) - 8 - 4 - 20
-	var message []byte = make([]byte, len(body) - 8 - 4 - 20)
+	var message []byte = make([]byte, size)
 
 	copy(message, body[:size])
 
@@ -309,8 +314,6 @@ func check_message_integrity(body []byte, pwd string) {
 	length -= binary.BigEndian.Uint16(FINGERPRINT_LENGTH)
 	length -= HEADER_ATTRIBUTE_LENGTH
 	binary.BigEndian.PutUint16(message[2:4], length)
-
-//	hash := sha1.Sum(body)
 
 	key := []byte(pwd)
 	h := hmac.New(sha1.New, key)
@@ -320,9 +323,11 @@ func check_message_integrity(body []byte, pwd string) {
 }
 
 func (client *WebrtcConnection) SendRequest() error {
-	var transaction []byte
-	var request []byte
-	var ip, port string
+	var (
+		transaction []byte
+		request []byte
+		ip, port string
+	)
 
 	if PUBLIC_MODE {
 		ip = client.ip_client
@@ -362,10 +367,11 @@ func (client *WebrtcConnection) SendRequest() error {
 }
 
 func (client *WebrtcConnection) ReceiveResponse(buffer []byte) {
-	var index uint16 = 20
-
-	var ip string
-	var port string
+	var (
+		index uint16 = 20
+		ip string
+		port string
+	)
 
 	type_attr := []byte{buffer[index], buffer[index+1]}
 
@@ -380,8 +386,10 @@ func (client *WebrtcConnection) ReceiveResponse(buffer []byte) {
 func (client *WebrtcConnection) SendResponse(buffer []byte,
 	browserAddr *net.UDPAddr) error {
 
-	var response []byte
-	var transaction []byte
+	var (
+		response []byte
+		transaction []byte
+	)
 
 	fmt.Println("Create STUN Response.")
 

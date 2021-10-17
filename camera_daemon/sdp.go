@@ -16,26 +16,30 @@ var ATTRIBUTE_S = "s=Live Stream"
 
 var ATTRIBUTE_T = "t=0 0"
 
-var ATTRIBUTE_M = "m=video"
-var ATTRIBUTE_M_PAYLOAD_102 = "102"
-var ATTRIBUTE_M_RTP_SAVP = "RTP/SAVP"
+var (
+	ATTRIBUTE_M = "m=video"
+	ATTRIBUTE_M_PAYLOAD_102 = "102"
+	ATTRIBUTE_M_RTP_SAVP = "RTP/SAVP"
+)
 
 var ATTRIBUTE_C = "c=IN IP4"
 
-var ATTRIBUTE_A_MID = "a=mid:0"
-var ATTRIBUTE_A_TOOL = "a=tool"
-var ATTRIBUTE_A_RTCP = "a=rtcp:"
-var ATTRIBUTE_A_ICE_PWD = "a=ice-pwd:"
-var ATTRIBUTE_A_ICE_UFRAG = "a=ice-ufrag:"
-var ATTRIBUTE_A_RTCP_IP4 = "IN IP4"
-var ATTRIBUTE_A_SENDONLY = "a=sendonly"
-var ATTRIBUTE_A_RTCP_MUX = "a=rtcp-mux"
-var ATTRIBUTE_A_SETUP_ACTIVE = "a=setup:active"
-var ATTRIBUTE_A_ICE_OPTIONS = "a=ice-options:trickle"
-var ATTRIBUTE_A_FINGERPRINT_SHA_256 = "a=fingerprint:sha-256"
-var ATTRIBUTE_A_RTPMAP = "a=rtpmap:" + ATTRIBUTE_M_PAYLOAD_102 + " H264/90000"
-var ATTRIBUTE_A_FMTP = "a=fmtp:" + ATTRIBUTE_M_PAYLOAD_102 +
-	" packetization-mode=1"
+var (
+	ATTRIBUTE_A_MID = "a=mid:0"
+	ATTRIBUTE_A_TOOL = "a=tool"
+	ATTRIBUTE_A_RTCP = "a=rtcp:"
+	ATTRIBUTE_A_ICE_PWD = "a=ice-pwd:"
+	ATTRIBUTE_A_ICE_UFRAG = "a=ice-ufrag:"
+	ATTRIBUTE_A_RTCP_IP4 = "IN IP4"
+	ATTRIBUTE_A_SENDONLY = "a=sendonly"
+	ATTRIBUTE_A_RTCP_MUX = "a=rtcp-mux"
+	ATTRIBUTE_A_SETUP_ACTIVE = "a=setup:active"
+	ATTRIBUTE_A_ICE_OPTIONS = "a=ice-options:trickle"
+	ATTRIBUTE_A_FINGERPRINT_SHA_256 = "a=fingerprint:sha-256"
+	ATTRIBUTE_A_RTPMAP = "a=rtpmap:" + ATTRIBUTE_M_PAYLOAD_102 + " H264/90000"
+	ATTRIBUTE_A_FMTP = "a=fmtp:" + ATTRIBUTE_M_PAYLOAD_102 +
+		" packetization-mode=1"
+)
 
 var END_LINE = "\r\n"
 
