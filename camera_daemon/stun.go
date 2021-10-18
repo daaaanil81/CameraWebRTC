@@ -332,18 +332,10 @@ func (client *WebrtcConnection) SendRequest() error {
 	var (
 		transaction []byte
 		request []byte
-		ip, port string
 	)
 
-	if PUBLIC_MODE {
-		ip = client.ip_client
-	} else {
-		ip = client.ip_local
-	}
-
-	port = client.port_client
-
-	browserAddr, err := net.ResolveUDPAddr("udp", ip+":"+port)
+	browserAddr, err := net.ResolveUDPAddr("udp",
+		client.ip_client+":"+client.port_client)
 	if err != nil {
 		fmt.Println(err)
 
