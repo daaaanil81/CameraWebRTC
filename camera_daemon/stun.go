@@ -66,9 +66,11 @@ func XorMappedAddressDecode(buf []byte, index uint16, ip, port *string) uint16 {
 	*port = fmt.Sprintf("%d", int(buf[index+2]^MAGICK[0])<<8|
 		int(buf[index+3]^MAGICK[1]))
 
-	fmt.Printf("Family %#x\n", family)
-	fmt.Printf("IP: %s\n", *ip)
-	fmt.Printf("Port: %s\n", *port)
+	if DEBUG_MODE {
+		fmt.Printf("Family %#x\n", family)
+		fmt.Printf("IP: %s\n", *ip)
+		fmt.Printf("Port: %s\n", *port)
+	}
 
 	return index + binary.LittleEndian.Uint16(XOR_MAPPED_ADDRESS_LENGTH)
 }
@@ -93,7 +95,9 @@ func (client *WebrtcConnection) RequestStunServer() error {
 
 	request = CreateHeader(transaction)
 
-	fmt.Printf("%s\n", hex.Dump(request))
+	if DEBUG_MODE {
+		fmt.Printf("%s\n", hex.Dump(request))
+	}
 
 	_, err = client.connectionUDP.WriteToUDP(request, server)
 	if err != nil {
@@ -129,7 +133,9 @@ func (client *WebrtcConnection) ResponseStunServer() error {
 		}
 	}
 
-	fmt.Printf("%s\n", hex.Dump(buffer[0:n]))
+	if DEBUG_MODE {
+		fmt.Printf("%s\n", hex.Dump(buffer[0:n]))
+	}
 
 	return nil
 }
@@ -344,7 +350,9 @@ func (client *WebrtcConnection) SendRequest() error {
 		return err
 	}
 
-	fmt.Println("Create STUN Request.")
+	if DEBUG_MODE {
+		fmt.Println("Create STUN Request.")
+	}
 
 	request = CreateHeader(transaction)
 	request = stun_software(request)
@@ -354,7 +362,9 @@ func (client *WebrtcConnection) SendRequest() error {
 	request = stun_message_integrity(request, client.ice_pwd_c)
 	request = stun_fingerprint(request)
 
-	fmt.Printf("%s\n", hex.Dump(request))
+	if DEBUG_MODE {
+		fmt.Printf("%s\n", hex.Dump(request))
+	}
 
 	_, err = client.connectionUDP.WriteToUDP(request, browserAddr)
 	if err != nil {
@@ -380,7 +390,9 @@ func (client *WebrtcConnection) ReceiveResponse(buffer []byte) {
 			&ip, &port)
 	}
 
-	fmt.Printf("Address from response: %s:%s\n", ip, port)
+	if DEBUG_MODE {
+		fmt.Printf("Address from response: %s:%s\n", ip, port)
+	}
 }
 
 func (client *WebrtcConnection) SendResponse(buffer []byte,
@@ -391,7 +403,9 @@ func (client *WebrtcConnection) SendResponse(buffer []byte,
 		transaction []byte
 	)
 
-	fmt.Println("Create STUN Response.")
+	if DEBUG_MODE {
+		fmt.Println("Create STUN Response.")
+	}
 
 	check_message_integrity(buffer, client.ice_pwd_s)
 
@@ -401,7 +415,9 @@ func (client *WebrtcConnection) SendResponse(buffer []byte,
 	response = stun_message_integrity(response, client.ice_pwd_c)
 	response = stun_fingerprint(response)
 
-	fmt.Printf("%s\n", hex.Dump(response))
+	if DEBUG_MODE {
+		fmt.Printf("%s\n", hex.Dump(response))
+	}
 
 	_, err := client.connectionUDP.WriteToUDP(response, browserAddr)
 	if err != nil {

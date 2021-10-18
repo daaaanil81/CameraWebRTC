@@ -24,6 +24,7 @@ var (
 	STUN_REQUEST = []byte{0x00, 0x01}
 	RTP_MESSAGE = []byte{0x80, 0x00}
 	BAD_RESULT = -1
+	DEBUG_MODE = true
 )
 
 type WebrtcConnection struct {
@@ -177,11 +178,16 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 		}
 
 		message := buffer[:n]
-		fmt.Println("Receive INFO")
-		fmt.Println("BrowserAddr: ", browserAddr.String())
+		if DEBUG_MODE {
+			fmt.Println("Receive INFO")
+			fmt.Println("BrowserAddr: ", browserAddr.String())
+		}
+
 		if bytes.Equal(message[0:2], STUN_REQUEST) {
-			fmt.Println("Receive STUN Request\n")
-			fmt.Printf("%s\n", hex.Dump(message))
+			if DEBUG_MODE {
+				fmt.Println("Receive STUN Request\n")
+				fmt.Printf("%s\n", hex.Dump(message))
+			}
 
 			err = client.SendResponse(message, browserAddr)
 			if err != nil {
@@ -198,13 +204,20 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			}
 
 		} else if bytes.Equal(message[0:2], STUN_RESPONSE) {
-			fmt.Println("Receive STUN Response\n")
-			fmt.Printf("%s\n", hex.Dump(message))
+			if DEBUG_MODE {
+				fmt.Println("Receive STUN Response\n")
+				fmt.Printf("%s\n", hex.Dump(message))
+			}
 
 			client.ReceiveResponse(message)
 		} else if bytes.Equal(message[0:2], RTP_MESSAGE){
-			fmt.Println("Receive RTP\n")
-			fmt.Printf("%s\n", hex.Dump(message))
+			if DEBUG_MODE {
+				fmt.Println("Receive RTP\n")
+				fmt.Printf("%s\n", hex.Dump(message))
+			}
+
+		} else {
+			fmt.Println("This may be DTLS\n")
 		}
 	}
 
