@@ -4,16 +4,61 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"net/http"
+	"net"
 	"os"
 	"time"
 	"golang.org/x/net/websocket"
+
+	"github.com/pion/dtls/v2"
+	"github.com/pion/dtls/v2/examples/util"
 )
 
 var (
 	DATABASE_PATH = "/etc/camera_server/static/database/database.txt"
 	PUBLIC_MODE bool
 )
+
+func (client *WebrtcConnection) dtls() {
+
+	certificate, err := util.LoadKeyAndCertificate(KEY_FILE_PATH, CRT_FILE_PATH)
+	util.Check(err)
+
+	rootCertificate, err := util.LoadCertificate(CRT_FILE_PATH)
+	util.Check(err)
+	certPool := x509.NewCertPool()
+	cert, err := x509.ParseCertificate(rootCertificate.Certificate[0])
+	util.Check(err)
+	certPool.AddCert(cert)
+
+	// Prepare the configuration of the DTLS connection
+	config := &dtls.Config{
+		Certificates:         []tls.Certificate{*certificate},
+		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
+		RootCAs:              certPool,
+	}
+
+	fmt.Println("Opened certificate")
+
+	// Connect to a DTLS server
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	dtlsConn, err := dtls.ClientWithContext(ctx, client.connectionUDP, config)
+	fmt.Println("ClientWithcontext")
+	util.Check(err)
+	defer func() {
+		util.Check(dtlsConn.Close())
+	}()
+
+	fmt.Println("Connected; type 'exit' to shutdown gracefully")
+
+	// Simulate a chat session
+	//	util.Chat(dtlsConn)
+}
 
 func loadPage(filename string) ([]byte, error) {
 	body, err := ioutil.ReadFile(filename)
@@ -123,6 +168,20 @@ func WSClient(ws *websocket.Conn) {
 	}
 
 	fmt.Println("Exchange finished")
+
+	conn.connectionUDP.Close()
+
+	laddr,_ := net.ResolveUDPAddr("udp",
+		conn.ip_server+":"+conn.port_server)
+
+	raddr,_ := net.ResolveUDPAddr("udp",
+		conn.ip_client+":"+conn.port_client)
+
+	conn.connectionUDP, err = net.DialUDP("udp", laddr, raddr)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	go conn.MessageController(done)
 	<- done

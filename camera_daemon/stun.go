@@ -133,6 +133,10 @@ func (client *WebrtcConnection) ResponseStunServer() error {
 		}
 	}
 
+	if PUBLIC_MODE == false {
+		client.ip_server = client.ip_local
+	}
+
 	if DEBUG_MODE {
 		fmt.Printf("%s\n", hex.Dump(buffer[0:n]))
 	}
@@ -152,10 +156,13 @@ func stun_xor_mapped(addr net.UDPAddr, body []byte) []byte {
 	ip := make([]byte, 4)
 	port := make([]byte, 2)
 
+	fmt.Println("addr.IP = ", addr.IP)
+	fmt.Printf("%s\n", hex.Dump(addr.IP))
+
     binary.BigEndian.PutUint16(port, uint16(addr.Port))
 
 	for i := 0; i < 4; i++ {
-		ip[i] = addr.IP[12+i] ^ MAGICK[i]
+		ip[i] = addr.IP[i] ^ MAGICK[i]
 	}
 
 	for i := 0; i < 2; i++ {
@@ -334,13 +341,13 @@ func (client *WebrtcConnection) SendRequest() error {
 		request []byte
 	)
 
-	browserAddr, err := net.ResolveUDPAddr("udp",
-		client.ip_client+":"+client.port_client)
-	if err != nil {
-		fmt.Println(err)
-
-		return err
-	}
+	// browserAddr, err := net.ResolveUDPAddr("udp",
+	// client.ip_client+":"+client.port_client)
+	// if err != nil {
+	// 	fmt.Println(err)
+	//
+	// 	return err
+	// }
 
 	if DEBUG_MODE {
 		fmt.Println("Create STUN Request.")
@@ -358,7 +365,7 @@ func (client *WebrtcConnection) SendRequest() error {
 		fmt.Printf("%s\n", hex.Dump(request))
 	}
 
-	_, err = client.connectionUDP.WriteToUDP(request, browserAddr)
+	_, err := client.connectionUDP.Write(request)
 	if err != nil {
 		fmt.Println(err)
 
@@ -411,7 +418,7 @@ func (client *WebrtcConnection) SendResponse(buffer []byte,
 		fmt.Printf("%s\n", hex.Dump(response))
 	}
 
-	_, err := client.connectionUDP.WriteToUDP(response, browserAddr)
+	_, err := client.connectionUDP.Write(response)
 	if err != nil {
 		fmt.Println(err)
 	}

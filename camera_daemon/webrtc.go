@@ -210,6 +210,8 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			}
 
 			client.ReceiveResponse(message)
+			client.dtls()
+
 		} else if bytes.Equal(message[0:2], RTP_MESSAGE){
 			if DEBUG_MODE {
 				fmt.Println("Receive RTP\n")
