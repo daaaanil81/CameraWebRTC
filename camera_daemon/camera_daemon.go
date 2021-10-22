@@ -124,6 +124,11 @@ func WSClient(ws *websocket.Conn) {
 
 	fmt.Println("Exchange finished")
 
+	err = conn.DtlsConnection()
+	if err != nil {
+		return
+	}
+
 	go conn.MessageController(done)
 	<- done
 	time.Sleep(3 * time.Second)

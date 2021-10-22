@@ -1,5 +1,15 @@
 package main
 
+/*
+#cgo LDFLAGS: -lssl -lcrypto
+
+#include <openssl/ssl.h>
+#include <openssl/x509.h>
+#include <openssl/err.h>
+
+*/
+import "C"
+
 import (
 	"fmt"
 	"net"
@@ -227,6 +237,26 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 func (client *WebrtcConnection) CloseAll() {
 	fmt.Println("Closing socket " + client.connectionUDP.LocalAddr().String())
 	client.connectionUDP.Close()
+
+	if client.r_bio != nil {
+		C.BIO_free(client.r_bio)
+		fmt.Println("r_bio was cleaned")
+	}
+
+	if client.w_bio != nil {
+		C.BIO_free(client.w_bio)
+		fmt.Println("w_bio was cleaned")
+	}
+
+	// if client.ssl != nil {
+	// 	C.SSL_free(client.ssl)
+	// 	fmt.Println("ssl was cleaned")
+	// }
+
+	if client.ssl_ctx != nil {
+		C.SSL_CTX_free(client.ssl_ctx)
+		fmt.Println("ssl_ctx was cleaned")
+	}
 }
 
 func SetupCloseHandler(client *WebrtcConnection) {
