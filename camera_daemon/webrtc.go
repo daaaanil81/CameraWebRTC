@@ -37,9 +37,17 @@ var (
 	DEBUG_MODE = true
 )
 
+type DtlsConnectionData struct {
+	ssl_ctx       *C.SSL_CTX
+	ssl           *C.SSL
+	r_bio         *C.BIO
+	w_bio         *C.BIO
+}
+
 type WebrtcConnection struct {
 	connectionUDP *net.UDPConn
 	cert          *x509.Certificate
+	dtls_data     *DtlsConnectionData
 	ip_server     string
 	ip_local      string
 	port_local    string
@@ -236,25 +244,27 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 
 func (client *WebrtcConnection) CloseAll() {
 	fmt.Println("Closing socket " + client.connectionUDP.LocalAddr().String())
+	dtls_data := client.dtls_data
+
 	client.connectionUDP.Close()
 
-	if client.r_bio != nil {
-		C.BIO_free(client.r_bio)
+	if dtls_data.r_bio != nil {
+		C.BIO_free(dtls_data.r_bio)
 		fmt.Println("r_bio was cleaned")
 	}
 
-	if client.w_bio != nil {
-		C.BIO_free(client.w_bio)
+	if dtls_data.w_bio != nil {
+		C.BIO_free(dtls_data.w_bio)
 		fmt.Println("w_bio was cleaned")
 	}
 
-	// if client.ssl != nil {
-	// 	C.SSL_free(client.ssl)
+	// if dtls_data.ssl != nil {
+	// 	C.SSL_free(dtls_data.ssl)
 	// 	fmt.Println("ssl was cleaned")
 	// }
 
-	if client.ssl_ctx != nil {
-		C.SSL_CTX_free(client.ssl_ctx)
+	if dtls_data.ssl_ctx != nil {
+		C.SSL_CTX_free(dtls_data.ssl_ctx)
 		fmt.Println("ssl_ctx was cleaned")
 	}
 }

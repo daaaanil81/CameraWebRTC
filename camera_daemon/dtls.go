@@ -82,10 +82,10 @@ func GenericCiphers() string {
 	return "SRTP_AES128_CM_SHA1_80"
 }
 
-func (client *WebrtcConnection) SSL_CTX_new() error {
-	client.ssl_ctx = C.SSL_CTX_new(C.DTLS_client_method())
+func (dtls_data *DtlsConnectionData) SSL_CTX_new() error {
+	dtls_data.ssl_ctx = C.SSL_CTX_new(C.DTLS_client_method())
 
-	if client.ssl_ctx == nil {
+	if dtls_data.ssl_ctx == nil {
 		return errors.New("Error in SSL_CTX_new")
 	}
 
@@ -94,12 +94,12 @@ func (client *WebrtcConnection) SSL_CTX_new() error {
 	return nil
 }
 
-func (client *WebrtcConnection) LoadCertificates() error {
+func (dtls_data *DtlsConnectionData) LoadCertificates() error {
 	/* set the local certificate from CertFile */
 
 	pem_ptr := C.CString(PEM_FILE_PATH)
 
-    if C.SSL_CTX_use_certificate_file(client.ssl_ctx,
+    if C.SSL_CTX_use_certificate_file(dtls_data.ssl_ctx,
 		pem_ptr, C.SSL_FILETYPE_PEM) <= 0 {
 		return errors.New("Error with SSL_CTX_use_certificate_file")
     }
@@ -107,7 +107,7 @@ func (client *WebrtcConnection) LoadCertificates() error {
 	fmt.Println("Success with SSL_CTX_use_certificate");
 
 	/* set the private key from KeyFile (may be the same as CertFile) */
-    if C.SSL_CTX_use_PrivateKey_file(client.ssl_ctx,
+    if C.SSL_CTX_use_PrivateKey_file(dtls_data.ssl_ctx,
 		pem_ptr, C.SSL_FILETYPE_PEM) <= 0 {
 		return errors.New("Error with SSL_CTX_use_PrivateKey_file")
     }
@@ -117,14 +117,14 @@ func (client *WebrtcConnection) LoadCertificates() error {
 	C.free(unsafe.Pointer(pem_ptr))
 
     /* verify private key */
-    if C.SSL_CTX_check_private_key(client.ssl_ctx) == 0 {
+    if C.SSL_CTX_check_private_key(dtls_data.ssl_ctx) == 0 {
 		return errors.New("Private key does not match the public certificate")
 	}
 
 	return nil
 }
 
-func (client *WebrtcConnection) SetCipherList() error {
+func (dtls_data *DtlsConnectionData) SetCipherList() error {
 
 	/* SSL_CTX_set_cipher_list() sets the list of available ciphers
 	  (TLSv1.2 and below) for ctx using the control string str. */
@@ -139,8 +139,8 @@ func (client *WebrtcConnection) SetCipherList() error {
 	ciphers_ptr := C.CString(ciphers)
 	ciphers_list_ptr := C.CString("ALL:!ADH:!LOW:!EXP:!MD5:@STRENGTH")
 
-	C.SSL_CTX_set_cipher_list(client.ssl_ctx, ciphers_list_ptr)
-	if C.SSL_CTX_set_tlsext_use_srtp(client.ssl_ctx, ciphers_ptr) > 0 {
+	C.SSL_CTX_set_cipher_list(dtls_data.ssl_ctx, ciphers_list_ptr)
+	if C.SSL_CTX_set_tlsext_use_srtp(dtls_data.ssl_ctx, ciphers_ptr) > 0 {
 		return errors.New("Error in SSL_CTX_set_tlsext_use_srtp")
 	}
 
@@ -152,26 +152,26 @@ func (client *WebrtcConnection) SetCipherList() error {
 	return nil
 }
 
-func (client *WebrtcConnection) SSL_CTX_set_read_ahead(choice int) {
+func (dtls_data *DtlsConnectionData) SSL_CTX_set_read_ahead(choice int) {
 
 	/* SSL_CTX_set_read_ahead set whether we should read as many input bytes
 	  as possible (for non-blocking reads) or not. */
 
 	//Same: C.SSL_CTX_set_read_ahead(client.ssl_ctx, choice)
-	C.SSL_CTX_ctrl(client.ssl_ctx, C.SSL_CTRL_SET_READ_AHEAD,
+	C.SSL_CTX_ctrl(dtls_data.ssl_ctx, C.SSL_CTRL_SET_READ_AHEAD,
 		C.long(choice), nil)
 
 	fmt.Println("Success with SSL_CTX_set_read_ahead");
 }
 
-func (client *WebrtcConnection) SSL_new() error {
+func (dtls_data *DtlsConnectionData) SSL_new() error {
 	/* SSL_new() creates a new SSL structure which is needed to hold the
 	   data for a TLS/SSL connection. The new structure inherits the
 	   settings of the underlying context ctx: connection method, options,
 	   verification settings, timeout settings. */
 
-	client.ssl = C.SSL_new(client.ssl_ctx)
-	if client.ssl == nil {
+	dtls_data.ssl = C.SSL_new(dtls_data.ssl_ctx)
+	if dtls_data.ssl == nil {
 		return errors.New("Error in SSL_new")
 	}
 
@@ -180,15 +180,15 @@ func (client *WebrtcConnection) SSL_new() error {
 	return nil
 }
 
-func (client *WebrtcConnection) CreateBIOs() error {
+func (dtls_data *DtlsConnectionData) CreateBIOs() error {
 	/* A memory BIO is a source/sink BIO which uses memory
 	   for its I/O. Data written to a memory BIO is stored
 	   in a BUF_MEM structure which is extended as appropriate
 	   to accommodate the stored data.*/
 
-	client.r_bio = C.BIO_new(C.BIO_s_mem())
-	client.w_bio = C.BIO_new(C.BIO_s_mem())
-	if client.r_bio == nil || client.w_bio == nil {
+	dtls_data.r_bio = C.BIO_new(C.BIO_s_mem())
+	dtls_data.w_bio = C.BIO_new(C.BIO_s_mem())
+	if dtls_data.r_bio == nil || dtls_data.w_bio == nil {
 		return errors.New("Error in BIO_new")
 	}
 
@@ -197,18 +197,18 @@ func (client *WebrtcConnection) CreateBIOs() error {
 	return nil
 }
 
-func (client *WebrtcConnection) SSL_set_bio() error {
+func (dtls_data *DtlsConnectionData) SSL_set_bio() error {
 	/*SSL_set_bio() connects the BIOs rbio and wbio
 	  for the read and write operations of the TLS/SSL
 	  (encrypted) side of ssl.*/
 
-	C.SSL_set_bio(client.ssl, client.r_bio, client.w_bio)
+	C.SSL_set_bio(dtls_data.ssl, dtls_data.r_bio, dtls_data.w_bio)
 	fmt.Println("Success with SSL_set_bio")
 
 	return nil
 }
 
-func (client *WebrtcConnection) SSL_set_mode() {
+func (dtls_data *DtlsConnectionData) SSL_set_mode() {
 
 	/* SSL_set_mode() adds the mode set via bitmask in mode
 	  to ssl. Options already set before are not cleared.*/
@@ -232,12 +232,12 @@ func (client *WebrtcConnection) SSL_set_mode() {
 		C.SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER
 
 	//Same: C.SSL_set_mode(client.ssl, mode)
-	C.SSL_ctrl(client.ssl, C.SSL_CTRL_MODE, C.long(mode), nil)
+	C.SSL_ctrl(dtls_data.ssl, C.SSL_CTRL_MODE, C.long(mode), nil)
 
 	fmt.Println("Success with SSL_set_mode")
 }
 
-func (client *WebrtcConnection) SSL_set_options() error {
+func (dtls_data *DtlsConnectionData) SSL_set_options() error {
 	/* An EC_KEY represents a public key and, optionally,
 	   the associated private key. A new EC_KEY with no
 	   associated curve can be constructed by calling
@@ -254,9 +254,9 @@ func (client *WebrtcConnection) SSL_set_options() error {
 		return errors.New("Error in EC_KEY_new_by_curve_name")
 	}
 
-	C.SSL_set_options(client.ssl, C.SSL_OP_SINGLE_ECDH_USE);
+	C.SSL_set_options(dtls_data.ssl, C.SSL_OP_SINGLE_ECDH_USE);
 	//Same: C.SSL_set_tmp_ecdh(client.ssl, ecdh)
-	C.SSL_ctrl(client.ssl, C.SSL_CTRL_SET_TMP_ECDH, 0, unsafe.Pointer(ecdh))
+	C.SSL_ctrl(dtls_data.ssl, C.SSL_CTRL_SET_TMP_ECDH, 0, unsafe.Pointer(ecdh))
 	C.EC_KEY_free(ecdh);
 
 	fmt.Println("Success with SSL_set_options")
@@ -265,48 +265,50 @@ func (client *WebrtcConnection) SSL_set_options() error {
 }
 
 func (client *WebrtcConnection) DtlsConnection() error {
-	err := client.SSL_CTX_new()
+	dtls_data := client.dtls_data
+
+	err := dtls_data.SSL_CTX_new()
 	if err != nil {
 		fmt.Println(err)
 
 		return err
 	}
 
-	err = client.LoadCertificates()
+	err = dtls_data.LoadCertificates()
 	if err != nil {
 		fmt.Println(err)
 
 		return err
 	}
 
-	err = client.SetCipherList()
+	err = dtls_data.SetCipherList()
 	if err != nil {
 		fmt.Println(err)
 
 		return err
 	}
 
-	client.SSL_CTX_set_read_ahead(YES)
+	dtls_data.SSL_CTX_set_read_ahead(YES)
 
-	err = client.SSL_new()
+	err = dtls_data.SSL_new()
 	if err != nil {
 		fmt.Println(err)
 
 		return err
 	}
 
-	err = client.CreateBIOs()
+	err = dtls_data.CreateBIOs()
 	if err != nil {
 		fmt.Println(err)
 
 		return err
 	}
 
-	client.SSL_set_bio()
+	dtls_data.SSL_set_bio()
 
-	client.SSL_set_mode()
+	dtls_data.SSL_set_mode()
 
-	client.SSL_set_options()
+	dtls_data.SSL_set_options()
 	if err != nil {
 		fmt.Println(err)
 
@@ -316,12 +318,12 @@ func (client *WebrtcConnection) DtlsConnection() error {
 	return nil
 }
 
-func (client *WebrtcConnection)try_connect() (int, error) {
+func (dtls_data *DtlsConnectionData) TryConnect() (int, error) {
 
 	fmt.Println("Try_connect")
 
-	ret := C.SSL_connect(client.ssl)
-	code := C.SSL_get_error(client.ssl, ret)
+	ret := C.SSL_connect(dtls_data.ssl)
+	code := C.SSL_get_error(dtls_data.ssl, ret)
 
 	switch code {
 	case C.SSL_ERROR_NONE:
