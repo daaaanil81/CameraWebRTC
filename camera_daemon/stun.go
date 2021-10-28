@@ -421,7 +421,7 @@ func (client *WebrtcConnection) SendResponse(buffer []byte,
 	transaction = ParseRequestStun(buffer)
 	response = CreateHeader(transaction)
 	response = stun_xor_mapped(*browserAddr, response)
-	response = stun_message_integrity(response, client.ice_pwd_c)
+	response = stun_message_integrity(response, client.ice_pwd_s)
 	response = stun_fingerprint(response)
 
 	if DEBUG_MODE {
