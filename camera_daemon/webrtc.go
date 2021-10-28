@@ -186,6 +186,7 @@ func (client *WebrtcConnection) SendICE(ws *websocket.Conn) error {
 func (client *WebrtcConnection) MessageController(done chan bool) {
 
 	buffer := make([]byte, 256)
+	dtls_flag := false
 
 	for {
 		n, browserAddr, err := client.connectionUDP.ReadFromUDP(buffer)
@@ -228,6 +229,12 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			}
 
 			client.ReceiveResponse(message)
+
+			if dtls_flag == false {
+				err = client.DtlsProccess([]byte{}, 0)
+				dtls_flag = true
+			}
+
 		} else if bytes.Equal(message[0:2], RTP_MESSAGE){
 			if DEBUG_MODE {
 				fmt.Println("Receive RTP\n")

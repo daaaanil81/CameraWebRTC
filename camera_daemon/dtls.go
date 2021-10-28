@@ -19,6 +19,7 @@ import 	(
 	"crypto/sha256"
 	"unsafe"
 	"errors"
+	"encoding/hex"
 )
 
 var (
@@ -319,7 +320,6 @@ func (client *WebrtcConnection) DtlsConnection() error {
 }
 
 func (dtls_data *DtlsConnectionData) TryConnect() (int, error) {
-
 	fmt.Println("Try_connect")
 
 	ret := C.SSL_connect(dtls_data.ssl)
@@ -329,17 +329,93 @@ func (dtls_data *DtlsConnectionData) TryConnect() (int, error) {
 	case C.SSL_ERROR_NONE:
 		ret = 1
 	case C.SSL_ERROR_WANT_READ:
+		ret = 0
 	case C.SSL_ERROR_WANT_WRITE:
 		ret = 0
 	default:
 		err := C.ERR_peek_last_error()
-		fmt.Println("DTLS error: ", C.ERR_reason_error_string(err))
-		return -1, errors.New("")
+		fmt.Println("DTLS error: " + C.GoString(C.ERR_reason_error_string(err)))
+		return -1, errors.New("Try connection error")
 	}
 
 	return int(ret), nil
 }
 
-func (client *WebrtcConnection) DtlsProccess() {
-	fmt.Println("DTLS");
+func (dtls_data *DtlsConnectionData) BIO_read() ([]byte, int) {
+	fmt.Println("BIO_read")
+
+	var buffer [0x10000]byte
+
+	ret := C.BIO_ctrl_pending(dtls_data.w_bio)
+	if ret <= 0 {
+		return []byte{}, int(ret)
+	}
+
+	buf := C.CBytes(buffer[:])
+
+	result := C.BIO_read(dtls_data.w_bio, unsafe.Pointer(buf), C.int(ret))
+
+	message := C.GoBytes(buf, C.int(ret))
+
+	C.free(unsafe.Pointer(buf))
+
+	if result <= 0 {
+		fmt.Println("Don't read")
+
+		return []byte{}, -1
+	}
+
+	return message[:ret], int(ret)
+}
+
+func (dtls_data *DtlsConnectionData) BIO_write(message []byte, length int) {
+	fmt.Println("BIO_write")
+
+	buf := C.CBytes(message)
+
+	C.BIO_write(dtls_data.r_bio, buf, C.int(length))
+
+	C.free(unsafe.Pointer(buf))
+}
+
+func (client *WebrtcConnection) DtlsProccess(message []byte, len int) error {
+	fmt.Println("DTLS Proccess");
+	var buf []byte
+
+	dtls_data := client.dtls_data
+
+	ret, err := dtls_data.TryConnect();
+
+	if ret == -1 {
+		fmt.Println(err)
+		return err
+	} else if (ret == 1) {
+		fmt.Println("Handshake: Successful");
+		//dtls_setup_crypto(d, &p_a->crypto, &p_a->crypto_rtcp, &p_a->crypto_from_camera);
+		return nil
+	}
+
+	if len != 0 {
+		dtls_data.BIO_write(message, len);
+	}
+
+	fmt.Println("Handshake: Wait Read/Write");
+
+	for {
+		buf, len = dtls_data.BIO_read()
+		if len <= 0 {
+			break
+		}
+
+		fmt.Println("Sending DTLS packet");
+
+		fmt.Printf("%s\n", hex.Dump(buf[:len]))
+	}
+
+	_, err = client.connectionUDP.WriteToUDP(response, browserAddr)
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	return nil
 }

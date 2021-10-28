@@ -67,6 +67,7 @@ func WSClient(ws *websocket.Conn) {
 		err error
 	)
 
+	conn.dtls_data = new(DtlsConnectionData)
 	done := make(chan bool, 1)
 
 	command := "CON"
