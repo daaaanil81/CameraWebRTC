@@ -9,8 +9,8 @@ import 	(
 	"crypto/sha256"
 )
 
-var CRT_FILE_PATH = "/etc/camera_server/static/certificate/danil_petrov.crt"
-var KEY_FILE_PATH = "/etc/camera_server/static/certificate/danil_petrov.key"
+var CRT_FILE_PATH = "/etc/camera_server/static/certificate/danil_petrov.pub.pem"
+var KEY_FILE_PATH = "/etc/camera_server/static/certificate/danil_petrov.pem"
 
 func (client *WebrtcConnection) OpenCert() error {
 

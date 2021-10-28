@@ -39,6 +39,7 @@ func (client *WebrtcConnection) dtls() {
 		Certificates:         []tls.Certificate{*certificate},
 		ExtendedMasterSecret: dtls.RequireExtendedMasterSecret,
 		RootCAs:              certPool,
+		InsecureSkipVerify:   true,
 	}
 
 	fmt.Println("Opened certificate")
@@ -57,7 +58,7 @@ func (client *WebrtcConnection) dtls() {
 	fmt.Println("Connected; type 'exit' to shutdown gracefully")
 
 	// Simulate a chat session
-	//	util.Chat(dtlsConn)
+	util.Chat(dtlsConn)
 }
 
 func loadPage(filename string) ([]byte, error) {
