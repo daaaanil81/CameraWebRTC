@@ -412,10 +412,5 @@ func (client *WebrtcConnection) DtlsProccess(message []byte, len int) error {
 		fmt.Printf("%s\n", hex.Dump(buf[:len]))
 	}
 
-	_, err = client.connectionUDP.WriteToUDP(response, browserAddr)
-	if err != nil {
-		fmt.Println(err)
-	}
-
 	return nil
 }
