@@ -328,6 +328,23 @@ func check_message_integrity(body []byte, pwd string) {
 //	fmt.Printf("%s\n", hex.Dump(h.Sum(nil)))
 }
 
+func check_fingerprint(buffer []byte) bool {
+	fmt.Println("Check START Fingerprint")
+	crc := make([]byte, 4)
+
+	fmt.Printf("%s\n", hex.Dump(buffer[:len(buffer) - 8]))
+
+	body := buffer[:len(buffer) - 8]
+
+	num := crc32.ChecksumIEEE(body) ^ FINGERPRINT
+	binary.BigEndian.PutUint32(crc, num)
+
+	fmt.Printf("CRC_TEST: \n%s\n", hex.Dump(crc))
+
+	fmt.Println("Check FINISH")
+	return true
+}
+
 func (client *WebrtcConnection) SendRequest() error {
 	var (
 		transaction []byte
