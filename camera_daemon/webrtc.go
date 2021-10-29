@@ -185,7 +185,7 @@ func (client *WebrtcConnection) SendICE(ws *websocket.Conn) error {
 
 func (client *WebrtcConnection) MessageController(done chan bool) {
 
-	buffer := make([]byte, 256)
+	buffer := make([]byte, 0x10000)
 	dtls_flag := false
 
 	for {
@@ -231,7 +231,7 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			client.ReceiveResponse(message)
 
 			if dtls_flag == false {
-				err = client.DtlsProccess([]byte{}, 0)
+				client.DtlsProccess(browserAddr, []byte{}, 0)
 				dtls_flag = true
 			}
 
@@ -242,7 +242,12 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			}
 
 		} else {
-			fmt.Println("This may be DTLS\n")
+			if DEBUG_MODE {
+				fmt.Println("Receive DTLS package\n")
+				fmt.Printf("%s\n", hex.Dump(message))
+			}
+
+			client.DtlsProccess(browserAddr, message, n)
 		}
 	}
 

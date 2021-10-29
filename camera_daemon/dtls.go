@@ -20,6 +20,7 @@ import 	(
 	"unsafe"
 	"errors"
 	"encoding/hex"
+	"net"
 )
 
 var (
@@ -348,6 +349,7 @@ func (dtls_data *DtlsConnectionData) BIO_read() ([]byte, int) {
 
 	ret := C.BIO_ctrl_pending(dtls_data.w_bio)
 	if ret <= 0 {
+		fmt.Println("BIO_pending error")
 		return []byte{}, int(ret)
 	}
 
@@ -378,11 +380,15 @@ func (dtls_data *DtlsConnectionData) BIO_write(message []byte, length int) {
 	C.free(unsafe.Pointer(buf))
 }
 
-func (client *WebrtcConnection) DtlsProccess(message []byte, len int) error {
+func (client *WebrtcConnection) DtlsProccess(browserAddr *net.UDPAddr, message []byte, len int) error {
 	fmt.Println("DTLS Proccess");
 	var buf []byte
 
 	dtls_data := client.dtls_data
+
+	if len != 0 {
+		dtls_data.BIO_write(message, len);
+	}
 
 	ret, err := dtls_data.TryConnect();
 
@@ -395,10 +401,6 @@ func (client *WebrtcConnection) DtlsProccess(message []byte, len int) error {
 		return nil
 	}
 
-	if len != 0 {
-		dtls_data.BIO_write(message, len);
-	}
-
 	fmt.Println("Handshake: Wait Read/Write");
 
 	for {
@@ -407,9 +409,15 @@ func (client *WebrtcConnection) DtlsProccess(message []byte, len int) error {
 			break
 		}
 
-		fmt.Println("Sending DTLS packet");
+		fmt.Println("Sending DTLS package");
 
 		fmt.Printf("%s\n", hex.Dump(buf[:len]))
+
+		_, err = client.connectionUDP.WriteToUDP(buf[:len], browserAddr)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
 	}
 
 	return nil
