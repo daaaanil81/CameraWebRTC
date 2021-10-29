@@ -19,13 +19,16 @@ import 	(
 	"crypto/sha256"
 	"unsafe"
 	"errors"
-	"encoding/hex"
 	"net"
 )
 
-var (
-	YES = 1
-	NO  = 0
+const (
+	YES                      = 1
+	NO                       = 0
+	SRTP_MAX_MASTER_SALT_LEN = 14
+	SRTP_MAX_MASTER_KEY_LEN  = 32
+	STR_MAX_KEY              = 2 *
+		(SRTP_MAX_MASTER_KEY_LEN + SRTP_MAX_MASTER_SALT_LEN)
 )
 
 var CRT_FILE_PATH = "/etc/camera_server/static/certificate/danil_petrov.crt"
@@ -380,6 +383,47 @@ func (dtls_data *DtlsConnectionData) BIO_write(message []byte, length int) {
 	C.free(unsafe.Pointer(buf))
 }
 
+func (dtls_data *DtlsConnectionData) SSL_export_keying_material() ([]byte, error) {
+	DEBUG_MESSAGE("SSL_export_keying_material")
+	var keysMem [STR_MAX_KEY]byte
+
+	extractor := C.CString("EXTRACTOR-dtls_srtp")
+	defer C.free(unsafe.Pointer(extractor))
+
+	res := C.SSL_export_keying_material(dtls_data.ssl, (*C.uchar)(&keysMem[0]),
+		STR_MAX_KEY, extractor, C.ulong(len("EXTRACTOR-dtls_srtp")), nil, 0, 0)
+	if res != 1 {
+		return []byte{}, errors.New("Failed to export keying material")
+	}
+
+	keys := keysMem[:]
+
+	return keys, nil
+}
+
+func (dtls_data *DtlsConnectionData) DtlsSetupCrypto() error {
+	DEBUG_MESSAGE("Dtls_setup_crypto")
+
+	spp := C.SSL_get_selected_srtp_profile(dtls_data.ssl)
+	if spp == nil {
+		return errors.New("Error with SSL_get_selected_srtp_profile")
+	}
+
+	if StrCmp(GenericCiphers(), spp.name) == false {
+		return errors.New("Error with nam of srtp profile")
+	}
+
+	keys, err := dtls_data.SSL_export_keying_material()
+	if err != nil {
+		return err
+	}
+
+	DEBUG_MESSAGE_BLOCK("KEYS", keys)
+
+	DEBUG_MESSAGE("DTLS-SRTP successfully negotiated")
+	return nil
+}
+
 func (client *WebrtcConnection) DtlsProccess(browserAddr *net.UDPAddr, message []byte, len int) error {
 	DEBUG_MESSAGE("DTLS Proccess")
 
@@ -398,8 +442,8 @@ func (client *WebrtcConnection) DtlsProccess(browserAddr *net.UDPAddr, message [
 		return err
 	} else if (ret == 1) {
 		DEBUG_MESSAGE("Handshake: Successful");
-		//dtls_setup_crypto(d, &p_a->crypto, &p_a->crypto_rtcp, &p_a->crypto_from_camera);
-		return nil
+		err = dtls_data.DtlsSetupCrypto()
+		return err
 	}
 
 	DEBUG_MESSAGE("Handshake: Wait Read/Write")
@@ -414,8 +458,7 @@ func (client *WebrtcConnection) DtlsProccess(browserAddr *net.UDPAddr, message [
 
 		_, err = client.connectionUDP.WriteToUDP(buf[:len], browserAddr)
 		if err != nil {
-			fmt.Println(err)
-			break
+			return err
 		}
 	}
 

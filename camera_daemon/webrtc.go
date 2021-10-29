@@ -239,7 +239,12 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			client.ReceiveResponse(message)
 
 			if dtls_flag == false {
-				client.DtlsProccess(browserAddr, []byte{}, 0)
+				err = client.DtlsProccess(browserAddr, []byte{}, 0)
+				if err != nil {
+					fmt.Println(err)
+
+					break
+				}
 				dtls_flag = true
 			}
 
@@ -249,7 +254,12 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 		} else {
 			DEBUG_MESSAGE_BLOCK("Receive DTLS package", message)
 
-			client.DtlsProccess(browserAddr, message, n)
+			err = client.DtlsProccess(browserAddr, message, n)
+			if err != nil {
+				fmt.Println(err)
+
+				break
+			}
 		}
 	}
 
