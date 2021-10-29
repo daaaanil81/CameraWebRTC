@@ -62,6 +62,19 @@ type WebrtcConnection struct {
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
+func DEBUG_MESSAGE(str string) {
+	if DEBUG_MODE {
+		fmt.Println(str)
+	}
+}
+
+func DEBUG_MESSAGE_BLOCK(str string, message []byte) {
+	if DEBUG_MODE {
+		fmt.Println(str)
+		fmt.Printf("%s\n", hex.Dump(message))
+	}
+}
+
 func GetOutboundIP() string {
     conn, err := net.Dial("udp", "8.8.8.8:80")
     if err != nil {
@@ -203,10 +216,8 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 		}
 
 		if bytes.Equal(message[0:2], STUN_REQUEST) {
-			if DEBUG_MODE {
-				fmt.Println("Receive STUN Request\n")
-				fmt.Printf("%s\n", hex.Dump(message))
-			}
+
+			DEBUG_MESSAGE_BLOCK("Receive STUN Request", message)
 
 			err = client.SendResponse(message, browserAddr)
 			if err != nil {
@@ -223,10 +234,7 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			}
 
 		} else if bytes.Equal(message[0:2], STUN_RESPONSE) {
-			if DEBUG_MODE {
-				fmt.Println("Receive STUN Response\n")
-				fmt.Printf("%s\n", hex.Dump(message))
-			}
+			DEBUG_MESSAGE_BLOCK("Receive STUN Response", message)
 
 			client.ReceiveResponse(message)
 
@@ -236,16 +244,10 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			}
 
 		} else if bytes.Equal(message[0:2], RTP_MESSAGE){
-			if DEBUG_MODE {
-				fmt.Println("Receive RTP\n")
-				fmt.Printf("%s\n", hex.Dump(message))
-			}
+			DEBUG_MESSAGE_BLOCK("Receive RTP", message)
 
 		} else {
-			if DEBUG_MODE {
-				fmt.Println("Receive DTLS package\n")
-				fmt.Printf("%s\n", hex.Dump(message))
-			}
+			DEBUG_MESSAGE_BLOCK("Receive DTLS package", message)
 
 			client.DtlsProccess(browserAddr, message, n)
 		}

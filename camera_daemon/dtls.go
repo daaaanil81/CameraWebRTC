@@ -91,7 +91,7 @@ func (dtls_data *DtlsConnectionData) SSL_CTX_new() error {
 		return errors.New("Error in SSL_CTX_new")
 	}
 
-	fmt.Println("Success with SSL_CTX_new");
+	DEBUG_MESSAGE("Success with SSL_CTX_new");
 
 	return nil
 }
@@ -106,7 +106,7 @@ func (dtls_data *DtlsConnectionData) LoadCertificates() error {
 		return errors.New("Error with SSL_CTX_use_certificate_file")
     }
 
-	fmt.Println("Success with SSL_CTX_use_certificate");
+	DEBUG_MESSAGE("Success with SSL_CTX_use_certificate");
 
 	/* set the private key from KeyFile (may be the same as CertFile) */
     if C.SSL_CTX_use_PrivateKey_file(dtls_data.ssl_ctx,
@@ -114,7 +114,7 @@ func (dtls_data *DtlsConnectionData) LoadCertificates() error {
 		return errors.New("Error with SSL_CTX_use_PrivateKey_file")
     }
 
-	fmt.Println("Success with SSL_CTX_use_PrivateKey");
+	DEBUG_MESSAGE("Success with SSL_CTX_use_PrivateKey");
 
 	C.free(unsafe.Pointer(pem_ptr))
 
@@ -149,7 +149,7 @@ func (dtls_data *DtlsConnectionData) SetCipherList() error {
 	C.free(unsafe.Pointer(ciphers_list_ptr))
 	C.free(unsafe.Pointer(ciphers_ptr))
 
-	fmt.Println("Success with SSL_CTX_set_tlsext_use_srtp")
+	DEBUG_MESSAGE("Success with SSL_CTX_set_tlsext_use_srtp")
 
 	return nil
 }
@@ -163,7 +163,7 @@ func (dtls_data *DtlsConnectionData) SSL_CTX_set_read_ahead(choice int) {
 	C.SSL_CTX_ctrl(dtls_data.ssl_ctx, C.SSL_CTRL_SET_READ_AHEAD,
 		C.long(choice), nil)
 
-	fmt.Println("Success with SSL_CTX_set_read_ahead");
+	DEBUG_MESSAGE("Success with SSL_CTX_set_read_ahead");
 }
 
 func (dtls_data *DtlsConnectionData) SSL_new() error {
@@ -177,7 +177,7 @@ func (dtls_data *DtlsConnectionData) SSL_new() error {
 		return errors.New("Error in SSL_new")
 	}
 
-	fmt.Println("Success with SSL_new");
+	DEBUG_MESSAGE("Success with SSL_new");
 
 	return nil
 }
@@ -194,7 +194,7 @@ func (dtls_data *DtlsConnectionData) CreateBIOs() error {
 		return errors.New("Error in BIO_new")
 	}
 
-	fmt.Println("BIO_new")
+	DEBUG_MESSAGE("BIO_new")
 
 	return nil
 }
@@ -205,7 +205,7 @@ func (dtls_data *DtlsConnectionData) SSL_set_bio() error {
 	  (encrypted) side of ssl.*/
 
 	C.SSL_set_bio(dtls_data.ssl, dtls_data.r_bio, dtls_data.w_bio)
-	fmt.Println("Success with SSL_set_bio")
+	DEBUG_MESSAGE("Success with SSL_set_bio")
 
 	return nil
 }
@@ -236,7 +236,7 @@ func (dtls_data *DtlsConnectionData) SSL_set_mode() {
 	//Same: C.SSL_set_mode(client.ssl, mode)
 	C.SSL_ctrl(dtls_data.ssl, C.SSL_CTRL_MODE, C.long(mode), nil)
 
-	fmt.Println("Success with SSL_set_mode")
+	DEBUG_MESSAGE("Success with SSL_set_mode")
 }
 
 func (dtls_data *DtlsConnectionData) SSL_set_options() error {
@@ -261,7 +261,7 @@ func (dtls_data *DtlsConnectionData) SSL_set_options() error {
 	C.SSL_ctrl(dtls_data.ssl, C.SSL_CTRL_SET_TMP_ECDH, 0, unsafe.Pointer(ecdh))
 	C.EC_KEY_free(ecdh);
 
-	fmt.Println("Success with SSL_set_options")
+	DEBUG_MESSAGE("Success with SSL_set_options")
 
 	return nil
 }
@@ -321,7 +321,7 @@ func (client *WebrtcConnection) DtlsConnection() error {
 }
 
 func (dtls_data *DtlsConnectionData) TryConnect() (int, error) {
-	fmt.Println("Try_connect")
+	DEBUG_MESSAGE("Try_connect")
 
 	ret := C.SSL_connect(dtls_data.ssl)
 	code := C.SSL_get_error(dtls_data.ssl, ret)
@@ -343,7 +343,7 @@ func (dtls_data *DtlsConnectionData) TryConnect() (int, error) {
 }
 
 func (dtls_data *DtlsConnectionData) BIO_read() ([]byte, int) {
-	fmt.Println("BIO_read")
+	DEBUG_MESSAGE("BIO_read")
 
 	var buffer [0x10000]byte
 
@@ -371,7 +371,7 @@ func (dtls_data *DtlsConnectionData) BIO_read() ([]byte, int) {
 }
 
 func (dtls_data *DtlsConnectionData) BIO_write(message []byte, length int) {
-	fmt.Println("BIO_write")
+	DEBUG_MESSAGE("BIO_write")
 
 	buf := C.CBytes(message)
 
@@ -381,7 +381,8 @@ func (dtls_data *DtlsConnectionData) BIO_write(message []byte, length int) {
 }
 
 func (client *WebrtcConnection) DtlsProccess(browserAddr *net.UDPAddr, message []byte, len int) error {
-	fmt.Println("DTLS Proccess");
+	DEBUG_MESSAGE("DTLS Proccess")
+
 	var buf []byte
 
 	dtls_data := client.dtls_data
@@ -396,12 +397,12 @@ func (client *WebrtcConnection) DtlsProccess(browserAddr *net.UDPAddr, message [
 		fmt.Println(err)
 		return err
 	} else if (ret == 1) {
-		fmt.Println("Handshake: Successful");
+		DEBUG_MESSAGE("Handshake: Successful");
 		//dtls_setup_crypto(d, &p_a->crypto, &p_a->crypto_rtcp, &p_a->crypto_from_camera);
 		return nil
 	}
 
-	fmt.Println("Handshake: Wait Read/Write");
+	DEBUG_MESSAGE("Handshake: Wait Read/Write")
 
 	for {
 		buf, len = dtls_data.BIO_read()
@@ -409,9 +410,7 @@ func (client *WebrtcConnection) DtlsProccess(browserAddr *net.UDPAddr, message [
 			break
 		}
 
-		fmt.Println("Sending DTLS package");
-
-		fmt.Printf("%s\n", hex.Dump(buf[:len]))
+		DEBUG_MESSAGE_BLOCK("Sending DTLS package", buf[:len])
 
 		_, err = client.connectionUDP.WriteToUDP(buf[:len], browserAddr)
 		if err != nil {

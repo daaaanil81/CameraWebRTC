@@ -91,13 +91,9 @@ func (client *WebrtcConnection) RequestStunServer() error {
 		return err
 	}
 
-	fmt.Println("Create Addr for Stun server.")
-
 	request = CreateHeader(transaction)
 
-	if DEBUG_MODE {
-		fmt.Printf("%s\n", hex.Dump(request))
-	}
+	DEBUG_MESSAGE_BLOCK("STUN request to Google", request)
 
 	_, err = client.connectionUDP.WriteToUDP(request, server)
 	if err != nil {
@@ -105,8 +101,6 @@ func (client *WebrtcConnection) RequestStunServer() error {
 
 		return err
 	}
-
-	fmt.Println("Write to server successful.")
 
 	return nil
 }
@@ -133,9 +127,7 @@ func (client *WebrtcConnection) ResponseStunServer() error {
 		}
 	}
 
-	if DEBUG_MODE {
-		fmt.Printf("%s\n", hex.Dump(buffer[0:n]))
-	}
+	DEBUG_MESSAGE_BLOCK("STUN response from Google", buffer[:n])
 
 	return nil
 }
@@ -359,10 +351,6 @@ func (client *WebrtcConnection) SendRequest() error {
 		return err
 	}
 
-	if DEBUG_MODE {
-		fmt.Println("Create STUN Request.")
-	}
-
 	request = CreateHeader(transaction)
 	request = stun_software(request)
 	request = stun_username(client.ice_ufrag_s, client.ice_ufrag_c, request)
@@ -371,9 +359,7 @@ func (client *WebrtcConnection) SendRequest() error {
 	request = stun_message_integrity(request, client.ice_pwd_c)
 	request = stun_fingerprint(request)
 
-	if DEBUG_MODE {
-		fmt.Printf("%s\n", hex.Dump(request))
-	}
+	DEBUG_MESSAGE_BLOCK("Create STUN Request", request)
 
 	_, err = client.connectionUDP.WriteToUDP(request, browserAddr)
 	if err != nil {
@@ -412,10 +398,6 @@ func (client *WebrtcConnection) SendResponse(buffer []byte,
 		transaction []byte
 	)
 
-	if DEBUG_MODE {
-		fmt.Println("Create STUN Response.")
-	}
-
 	check_message_integrity(buffer, client.ice_pwd_s)
 
 	transaction = ParseRequestStun(buffer)
@@ -424,9 +406,7 @@ func (client *WebrtcConnection) SendResponse(buffer []byte,
 	response = stun_message_integrity(response, client.ice_pwd_s)
 	response = stun_fingerprint(response)
 
-	if DEBUG_MODE {
-		fmt.Printf("%s\n", hex.Dump(response))
-	}
+	DEBUG_MESSAGE_BLOCK("Create STUN Response", response)
 
 	_, err := client.connectionUDP.WriteToUDP(response, browserAddr)
 	if err != nil {
