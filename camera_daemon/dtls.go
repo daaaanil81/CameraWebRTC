@@ -391,7 +391,7 @@ func (dtls_data *DtlsConnectionData) SSL_export_keying_material() ([]byte, error
 	defer C.free(unsafe.Pointer(extractor))
 
 	res := C.SSL_export_keying_material(dtls_data.ssl, (*C.uchar)(&keysMem[0]),
-		STR_MAX_KEY, extractor, C.ulong(len("EXTRACTOR-dtls_srtp")), nil, 0, 0)
+		STR_MAX_KEY, extractor, C.uint(len("EXTRACTOR-dtls_srtp")), nil, 0, 0)
 	if res != 1 {
 		return []byte{}, errors.New("Failed to export keying material")
 	}
