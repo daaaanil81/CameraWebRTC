@@ -149,7 +149,11 @@ func stun_xor_mapped(addr net.UDPAddr, body []byte) []byte {
 
 	DEBUG_MESSAGE_BLOCK("IP address:", addr.IP)
 
-	RealIP = addr.IP[12:]
+	if PUBLIC_MODE {
+		RealIP = addr.IP[12:]
+	} else {
+		RealIP = addr.IP
+	}
 
 	for i := 0; i < 4; i++ {
 		ip[i] = RealIP[i] ^ MAGICK[i]
