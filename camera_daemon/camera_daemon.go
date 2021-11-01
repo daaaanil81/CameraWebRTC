@@ -138,8 +138,10 @@ func WSClient(ws *websocket.Conn) {
 func main() {
 	mode := os.Getenv("PUBLIC_MODE")
 	if mode == "1" {
+		fmt.Println("Enable PUBLIC_MODE")
 		PUBLIC_MODE = true
 	} else {
+		fmt.Println("Disable PUBLIC_MODE")
 		PUBLIC_MODE = false
 	}
 

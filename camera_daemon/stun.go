@@ -143,11 +143,16 @@ func stun_xor_mapped(addr net.UDPAddr, body []byte) []byte {
 
 	ip := make([]byte, 4)
 	port := make([]byte, 2)
+	var RealIP []byte
 
     binary.BigEndian.PutUint16(port, uint16(addr.Port))
 
+	DEBUG_MESSAGE_BLOCK("IP address:", addr.IP)
+
+	RealIP = addr.IP[12:]
+
 	for i := 0; i < 4; i++ {
-		ip[i] = addr.IP[12+i] ^ MAGICK[i]
+		ip[i] = RealIP[i] ^ MAGICK[i]
 	}
 
 	for i := 0; i < 2; i++ {

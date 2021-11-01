@@ -103,15 +103,30 @@ func (client *WebrtcConnection) OpenConnection() error {
 
 	client.ip_local = GetOutboundIP()
 
-	client.connectionUDP, err = net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.ParseIP("0.0.0.0"),
-	})
+	// if PUBLIC_MODE {
+	// 	client.connectionUDP, err = net.ListenUDP("udp", nil,
+	// 		&net.UDPAddr{
+	// 			IP:   net.IPv4(224, 0, 0, 1),
+	// 			Port: 0,
+	// 		})
+	// } else {
+		client.connectionUDP, err = net.ListenUDP("udp4", &net.UDPAddr{
+			IP:   net.ParseIP("0.0.0.0"),
+		})
+	// }
+
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
 
 	localAddr := client.connectionUDP.LocalAddr().String()
-	index := strings.LastIndexByte(localAddr, ':')
-
 	fmt.Println("Port Opened = ", localAddr)
-	client.port_local = localAddr[index+1:]
+
+	index := strings.LastIndexByte(localAddr, ':')
+	if index != -1 {
+		client.port_local = localAddr[index+1:]
+	}
 
 //	client.connectionUDP.SetReadDeadline(time.Now().Add(time.Second * 5))
 
@@ -180,18 +195,16 @@ func (client *WebrtcConnection) ReceiveICE(ws *websocket.Conn) error {
 
 func (client *WebrtcConnection) SendICE(ws *websocket.Conn) error {
 	command := "ICE"
-
-	ice := client.CreateLocalICE()
-
-	text := command + ice
-	websocket.Message.Send(ws, text)
+	var ice string
 
 	if PUBLIC_MODE {
 		ice = client.CreatePublicICE()
-
-		text = command + ice
-		websocket.Message.Send(ws, text)
+	} else {
+		ice = client.CreateLocalICE()
 	}
+
+	text := command + ice
+	websocket.Message.Send(ws, text)
 
 	return nil
 }
@@ -267,10 +280,13 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 }
 
 func (client *WebrtcConnection) CloseAll() {
-	fmt.Println("Closing socket " + client.connectionUDP.LocalAddr().String())
-	dtls_data := client.dtls_data
+	if client.connectionUDP != nil {
+		fmt.Println("Closing socket " + client.connectionUDP.LocalAddr().String())
 
-	client.connectionUDP.Close()
+		client.connectionUDP.Close()
+	}
+
+	dtls_data := client.dtls_data
 
 	if dtls_data.r_bio != nil {
 		C.BIO_free(dtls_data.r_bio)
