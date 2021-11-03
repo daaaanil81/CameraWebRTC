@@ -21,27 +21,40 @@ import (
 	"os/signal"
 	"syscall"
 	"bytes"
+	"sync"
 	"encoding/hex"
 
 	"golang.org/x/net/websocket"
 )
 
 var (
-	IP_STUN_SERVER string = "108.177.15.127"
+	IP_STUN_SERVER string   = "108.177.15.127"
 	PORT_STUN_SERVER string = "19302"
-	last_port = 30000
-	STUN_RESPONSE = []byte{0x01, 0x01}
-	STUN_REQUEST = []byte{0x00, 0x01}
-	RTP_MESSAGE = []byte{0x80, 0x00}
-	BAD_RESULT = -1
-	DEBUG_MODE = true
+	STUN_RESPONSE           = []byte{0x01, 0x01}
+	STUN_REQUEST            = []byte{0x00, 0x01}
+	RTP_MESSAGE_1           = []byte{0x80, 0x60}
+	RTP_MESSAGE_2           = []byte{0x80, 0xe0}
+	BAD_RESULT              = -1
+	DEBUG_MODE              = true
+	PORT_FFMPEG             = 9011
+	ffmpeg_mutex sync.Mutex
+    ffmpeg_connection *net.UDPConn
 )
+
+
+type CryptoKeys struct {
+	master_key  [MASTER_KEY_LEN]byte
+	master_salt [MASTER_SALT_LEN]byte
+}
 
 type DtlsConnectionData struct {
 	ssl_ctx       *C.SSL_CTX
 	ssl           *C.SSL
 	r_bio         *C.BIO
 	w_bio         *C.BIO
+	crypto_rtp    *CryptoKeys // Crypto RTP message for browser  \ SAME
+	crypto_rtcp   *CryptoKeys // Crypto RTCP message for browser / SAME
+	decrypt       *CryptoKeys // Decrypto RTP and RTCP from browser
 }
 
 type WebrtcConnection struct {
@@ -96,6 +109,69 @@ func RandStringRunes(n int) string {
         b[i] = letterRunes[rand.Intn(len(letterRunes))]
     }
     return string(b)
+}
+
+func CreateConnection() (*net.UDPConn, error) {
+	connection, err := net.ListenUDP("udp", &net.UDPAddr{
+		IP:   net.ParseIP(GetOutboundIP()),
+		Port: PORT_FFMPEG,
+	})
+
+	if err != nil {
+		fmt.Println(err)
+		return nil, err
+	}
+
+	return connection, err
+}
+
+func StreamController(ip_address, port_str string) {
+
+	var port int
+	buffer := make([]byte, 0x10000)
+
+	fmt.Sscan(port_str, &port)
+
+	addr := &net.UDPAddr{
+		IP:   net.ParseIP(ip_address),
+		Port: port,
+	}
+
+	Lock := func() {
+		ffmpeg_mutex.Lock()
+//		DEBUG_MESSAGE("Locked")
+	}
+
+	UnLock := func() {
+		ffmpeg_mutex.Unlock()
+//		DEBUG_MESSAGE("Unlocked")
+	}
+
+	for {
+		Lock()
+
+		n, _, err := ffmpeg_connection.ReadFromUDP(buffer)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+
+		if n == 0 {
+			continue
+		}
+
+//		DEBUG_MESSAGE_BLOCK("RTP Stream", buffer[:n])
+
+		_, err = ffmpeg_connection.WriteToUDP(buffer[:n], addr)
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+
+		UnLock()
+	}
+
+	defer DEBUG_MESSAGE("StreamController was finished, Port: " + port_str)
 }
 
 func (client *WebrtcConnection) OpenConnection() error {
@@ -261,8 +337,9 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 				dtls_flag = true
 			}
 
-		} else if bytes.Equal(message[0:2], RTP_MESSAGE){
-			DEBUG_MESSAGE_BLOCK("Receive RTP", message)
+		} else if bytes.Equal(message[0:2], RTP_MESSAGE_1) ||
+			bytes.Equal(message[0:2], RTP_MESSAGE_2) {
+			DEBUG_MESSAGE("Receive RTP")
 
 		} else {
 			DEBUG_MESSAGE_BLOCK("Receive DTLS package", message)

@@ -131,11 +131,14 @@ func WSClient(ws *websocket.Conn) {
 	}
 
 	go conn.MessageController(done)
+	go StreamController(conn.ip_local, conn.port_local)
 	<- done
 	time.Sleep(3 * time.Second)
 }
 
 func main() {
+	var err error
+
 	mode := os.Getenv("PUBLIC_MODE")
 	if mode == "1" {
 		fmt.Println("Enable PUBLIC_MODE")
@@ -149,6 +152,19 @@ func main() {
 	http.Handle("/", fileServer)
 	http.HandleFunc("/login", formHandler)
  	http.Handle("/ws", websocket.Handler(WSClient))
+
+	ffmpeg_connection, err = CreateConnection()
+	if err != nil {
+		return
+	}
+
+	CloseFfmpeg := func() {
+		ffmpeg_mutex.Lock()
+		ffmpeg_connection.Close()
+		ffmpeg_mutex.Unlock()
+	}
+
+	defer CloseFfmpeg()
 
 	fmt.Printf("Starting server at port 8080\n")
 	if err := http.ListenAndServeTLS(":8080",

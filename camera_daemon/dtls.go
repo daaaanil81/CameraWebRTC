@@ -29,6 +29,10 @@ const (
 	SRTP_MAX_MASTER_KEY_LEN  = 32
 	STR_MAX_KEY              = 2 *
 		(SRTP_MAX_MASTER_KEY_LEN + SRTP_MAX_MASTER_SALT_LEN)
+	MASTER_KEY_LEN           = 16
+	MASTER_SALT_LEN          = 14
+	SESSION_KEY_LEN          = 16
+	SESSION_SALT_LEN         = 14
 )
 
 var CRT_FILE_PATH = "/etc/camera_server/static/certificate/danil_petrov.crt"
@@ -404,6 +408,15 @@ func (dtls_data *DtlsConnectionData) SSL_export_keying_material() ([]byte, error
 func (dtls_data *DtlsConnectionData) DtlsSetupCrypto() error {
 	DEBUG_MESSAGE("Dtls_setup_crypto")
 
+	start := 0
+	end := MASTER_KEY_LEN
+	dtls_data.crypto_rtp = new(CryptoKeys)
+	crypto_rtp := dtls_data.crypto_rtp
+	dtls_data.crypto_rtcp = new(CryptoKeys)
+	crypto_rtcp := dtls_data.crypto_rtcp
+	dtls_data.decrypt = new(CryptoKeys)
+	decrypt := dtls_data.decrypt
+
 	spp := C.SSL_get_selected_srtp_profile(dtls_data.ssl)
 	if spp == nil {
 		return errors.New("Error with SSL_get_selected_srtp_profile")
@@ -419,6 +432,38 @@ func (dtls_data *DtlsConnectionData) DtlsSetupCrypto() error {
 	}
 
 	DEBUG_MESSAGE_BLOCK("KEYS", keys)
+
+	// MASTER KEY
+
+	copy(crypto_rtp.master_key[:], keys[start:end])
+	DEBUG_MESSAGE_BLOCK("MASTER_KEY for RTP", crypto_rtp.master_key[:])
+
+	copy(crypto_rtcp.master_key[:], keys[start:end])
+	DEBUG_MESSAGE_BLOCK("MASTER_KEY for RTCP", crypto_rtcp.master_key[:])
+
+	start += MASTER_KEY_LEN
+	end += MASTER_KEY_LEN
+
+	copy(decrypt.master_key[:], keys[start:end])
+	DEBUG_MESSAGE_BLOCK("MASTER_KEY for Decrypt", decrypt.master_key[:])
+
+	start += MASTER_KEY_LEN
+	end += MASTER_SALT_LEN
+
+	// MASTER SALT
+
+	copy(crypto_rtp.master_salt[:], keys[start:end])
+	DEBUG_MESSAGE_BLOCK("MASTER_SALT for RTP", crypto_rtp.master_salt[:])
+
+	copy(crypto_rtcp.master_salt[:], keys[start:end])
+	DEBUG_MESSAGE_BLOCK("MASTER_SALT for RTCP", crypto_rtcp.master_salt[:])
+
+	start += MASTER_SALT_LEN
+	end += MASTER_SALT_LEN
+
+	copy(decrypt.master_salt[:], keys[start:end])
+	DEBUG_MESSAGE_BLOCK("MASTER_SALT for Decrypt", decrypt.master_salt[:])
+
 
 	DEBUG_MESSAGE("DTLS-SRTP successfully negotiated")
 	return nil
