@@ -11,50 +11,57 @@ package main
 import "C"
 
 import (
-	"fmt"
-	"net"
-	"strings"
+	"bytes"
 	"crypto/x509"
+	"encoding/hex"
+	"fmt"
 	"math/rand"
-	"time"
+	"net"
 	"os"
 	"os/signal"
-	"syscall"
-	"bytes"
+	"strings"
 	"sync"
-	"encoding/hex"
+	"syscall"
+	"time"
 
 	"golang.org/x/net/websocket"
 )
 
 var (
-	IP_STUN_SERVER string   = "108.177.15.127"
-	PORT_STUN_SERVER string = "19302"
-	STUN_RESPONSE           = []byte{0x01, 0x01}
-	STUN_REQUEST            = []byte{0x00, 0x01}
-	RTP_MESSAGE_1           = []byte{0x80, 0x60}
-	RTP_MESSAGE_2           = []byte{0x80, 0xe0}
-	BAD_RESULT              = -1
-	DEBUG_MODE              = true
-	PORT_FFMPEG             = 9011
-	ffmpeg_mutex sync.Mutex
-    ffmpeg_connection *net.UDPConn
+	IP_STUN_SERVER    string = "108.177.15.127"
+	PORT_STUN_SERVER  string = "19302"
+	STUN_RESPONSE            = []byte{0x01, 0x01}
+	STUN_REQUEST             = []byte{0x00, 0x01}
+	RTP_MESSAGE_1            = []byte{0x80, 0x60}
+	RTP_MESSAGE_2            = []byte{0x80, 0xe0}
+	BAD_RESULT               = -1
+	DEBUG_MODE               = true
+	PORT_FFMPEG              = 9011
+	ffmpeg_mutex      sync.Mutex
+	ffmpeg_connection *net.UDPConn
 )
 
-
 type CryptoKeys struct {
-	master_key  [MASTER_KEY_LEN]byte
-	master_salt [MASTER_SALT_LEN]byte
+	ctx              *C.EVP_CIPHER_CTX
+	have_session_key bool
+	index            uint64
+	master_key       [MASTER_KEY_LEN]byte
+	master_salt      [MASTER_SALT_LEN]byte
+	session_auth_key [SRTP_AUTH_KEY_LEN]byte
+	session_key      [SESSION_KEY_LEN]byte
+	session_key_ctx  *C.EVP_CIPHER_CTX
+	session_salt     [SESSION_SALT_LEN]byte
 }
 
 type DtlsConnectionData struct {
-	ssl_ctx       *C.SSL_CTX
-	ssl           *C.SSL
-	r_bio         *C.BIO
-	w_bio         *C.BIO
-	crypto_rtp    *CryptoKeys // Crypto RTP message for browser  \ SAME
-	crypto_rtcp   *CryptoKeys // Crypto RTCP message for browser / SAME
-	decrypt       *CryptoKeys // Decrypto RTP and RTCP from browser
+	ssl_ctx     *C.SSL_CTX
+	ssl         *C.SSL
+	r_bio       *C.BIO
+	w_bio       *C.BIO
+	aes_evp     *C.EVP_CIPHER
+	crypto_rtp  *CryptoKeys // Crypto RTP message for browser  \ SAME
+	crypto_rtcp *CryptoKeys // Crypto RTCP message for browser / SAME
+	decrypt     *CryptoKeys // Decrypto RTP and RTCP from browser
 }
 
 type WebrtcConnection struct {
@@ -89,31 +96,31 @@ func DEBUG_MESSAGE_BLOCK(str string, message []byte) {
 }
 
 func GetOutboundIP() string {
-    conn, err := net.Dial("udp", "8.8.8.8:80")
-    if err != nil {
-        fmt.Println(err)
-    }
-    defer conn.Close()
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		fmt.Println(err)
+	}
+	defer conn.Close()
 
-    localAddr := conn.LocalAddr().String()
+	localAddr := conn.LocalAddr().String()
 
 	index := strings.IndexByte(localAddr, ':')
 
-    return localAddr[:index]
+	return localAddr[:index]
 }
 
 func RandStringRunes(n int) string {
 	rand.Seed(time.Now().UnixNano())
-    b := make([]rune, n)
-    for i := range b {
-        b[i] = letterRunes[rand.Intn(len(letterRunes))]
-    }
-    return string(b)
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letterRunes[rand.Intn(len(letterRunes))]
+	}
+	return string(b)
 }
 
 func CreateConnection() (*net.UDPConn, error) {
 	connection, err := net.ListenUDP("udp", &net.UDPAddr{
-		IP:   net.ParseIP(GetOutboundIP()),
+		IP:   net.ParseIP("0.0.0.0"),
 		Port: PORT_FFMPEG,
 	})
 
@@ -139,12 +146,12 @@ func StreamController(ip_address, port_str string) {
 
 	Lock := func() {
 		ffmpeg_mutex.Lock()
-//		DEBUG_MESSAGE("Locked")
+		//		DEBUG_MESSAGE("Locked")
 	}
 
 	UnLock := func() {
 		ffmpeg_mutex.Unlock()
-//		DEBUG_MESSAGE("Unlocked")
+		//		DEBUG_MESSAGE("Unlocked")
 	}
 
 	for {
@@ -160,7 +167,7 @@ func StreamController(ip_address, port_str string) {
 			continue
 		}
 
-//		DEBUG_MESSAGE_BLOCK("RTP Stream", buffer[:n])
+		//		DEBUG_MESSAGE_BLOCK("RTP Stream", buffer[:n])
 
 		_, err = ffmpeg_connection.WriteToUDP(buffer[:n], addr)
 		if err != nil {
@@ -186,9 +193,9 @@ func (client *WebrtcConnection) OpenConnection() error {
 	// 			Port: 0,
 	// 		})
 	// } else {
-		client.connectionUDP, err = net.ListenUDP("udp4", &net.UDPAddr{
-			IP:   net.ParseIP("0.0.0.0"),
-		})
+	client.connectionUDP, err = net.ListenUDP("udp4", &net.UDPAddr{
+		IP: net.ParseIP("0.0.0.0"),
+	})
 	// }
 
 	if err != nil {
@@ -204,7 +211,7 @@ func (client *WebrtcConnection) OpenConnection() error {
 		client.port_local = localAddr[index+1:]
 	}
 
-//	client.connectionUDP.SetReadDeadline(time.Now().Add(time.Second * 5))
+	//	client.connectionUDP.SetReadDeadline(time.Now().Add(time.Second * 5))
 
 	return err
 }
@@ -289,6 +296,7 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 
 	buffer := make([]byte, 0x10000)
 	dtls_flag := false
+	var sequnce uint16 = 1
 
 	for {
 		n, browserAddr, err := client.connectionUDP.ReadFromUDP(buffer)
@@ -316,40 +324,31 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			}
 
 			err = client.SendRequest()
-			if err != nil {
-				fmt.Println(err)
-
-				break
-			}
 
 		} else if bytes.Equal(message[0:2], STUN_RESPONSE) {
 			DEBUG_MESSAGE_BLOCK("Receive STUN Response", message)
 
-			client.ReceiveResponse(message)
+			err = client.ReceiveResponse(message)
 
 			if dtls_flag == false {
 				err = client.DtlsProccess(browserAddr, []byte{}, 0)
-				if err != nil {
-					fmt.Println(err)
-
-					break
-				}
 				dtls_flag = true
 			}
 
 		} else if bytes.Equal(message[0:2], RTP_MESSAGE_1) ||
 			bytes.Equal(message[0:2], RTP_MESSAGE_2) {
 			DEBUG_MESSAGE("Receive RTP")
+			err = client.RtpToSrtp(message, &sequnce)
 
 		} else {
 			DEBUG_MESSAGE_BLOCK("Receive DTLS package", message)
 
 			err = client.DtlsProccess(browserAddr, message, n)
-			if err != nil {
-				fmt.Println(err)
+		}
 
-				break
-			}
+		if err != nil {
+			fmt.Println(err)
+			break
 		}
 	}
 

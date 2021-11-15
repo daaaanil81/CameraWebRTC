@@ -43,6 +43,7 @@ connection.onmessage = function(event) {
         connectionRTC.onicecandidate = sendIceCandidate;
         connectionRTC.createOffer(setLocalDescription, onError, options);
         connectionRTC.addEventListener('track', gotRemoteStream);
+        connectionRTC.addEventListener('iceconnectionstatechange', e => onIceStateChange(connectionRTC, e));
     }
 
     if (Type === 'SDP') {
@@ -61,6 +62,13 @@ connection.onmessage = function(event) {
         connectionRTC.addIceCandidate(candidate, sucIce, errorIce);
     }
 };
+
+function onIceStateChange(pc, event) {
+    if (pc) {
+        console.log(`ICE state: ${pc.iceConnectionState}`);
+        console.log('ICE state change event: ', event);
+    }
+}
 
 function sucIce() {
     console.log("Successful in candidate other user");
@@ -102,7 +110,9 @@ function sendIceCandidate(event) {
     console.log("Local Candidate");
     if (event.candidate) {
         console.log(event.candidate.candidate);
-        if (event.candidate.candidate.indexOf(".local", 0) == -1) {
+        var array = event.candidate.candidate.split(' ');
+        var ip_address = array[4];
+        if (event.candidate.candidate.indexOf(".local", 0) == -1 && ip_address.substr(0, 3) == '192') {
             localIce = event.candidate.candidate;
             connection.send("ICE");
             connection.send(event.candidate.candidate);

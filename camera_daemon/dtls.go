@@ -10,29 +10,31 @@ package main
 */
 import "C"
 
-import 	(
-	"fmt"
+import (
 	"bytes"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
-	"io/ioutil"
-	"crypto/sha256"
-	"unsafe"
 	"errors"
+	"fmt"
+	"io/ioutil"
 	"net"
+	"unsafe"
 )
 
 const (
-	YES                      = 1
-	NO                       = 0
-	SRTP_MAX_MASTER_SALT_LEN = 14
-	SRTP_MAX_MASTER_KEY_LEN  = 32
-	STR_MAX_KEY              = 2 *
-		(SRTP_MAX_MASTER_KEY_LEN + SRTP_MAX_MASTER_SALT_LEN)
 	MASTER_KEY_LEN           = 16
 	MASTER_SALT_LEN          = 14
+	NO                       = 0
 	SESSION_KEY_LEN          = 16
 	SESSION_SALT_LEN         = 14
+	SRTP_AUTH_KEY_LEN        = 20
+	SRTP_AUTH_TAG            = 10
+	SRTP_MAX_MASTER_KEY_LEN  = 32
+	SRTP_MAX_MASTER_SALT_LEN = 14
+	YES                      = 1
+	STR_MAX_KEY              = 2 *
+		(SRTP_MAX_MASTER_KEY_LEN + SRTP_MAX_MASTER_SALT_LEN)
 )
 
 var CRT_FILE_PATH = "/etc/camera_server/static/certificate/danil_petrov.crt"
@@ -98,7 +100,7 @@ func (dtls_data *DtlsConnectionData) SSL_CTX_new() error {
 		return errors.New("Error in SSL_CTX_new")
 	}
 
-	DEBUG_MESSAGE("Success with SSL_CTX_new");
+	DEBUG_MESSAGE("Success with SSL_CTX_new")
 
 	return nil
 }
@@ -108,25 +110,25 @@ func (dtls_data *DtlsConnectionData) LoadCertificates() error {
 
 	pem_ptr := C.CString(PEM_FILE_PATH)
 
-    if C.SSL_CTX_use_certificate_file(dtls_data.ssl_ctx,
+	if C.SSL_CTX_use_certificate_file(dtls_data.ssl_ctx,
 		pem_ptr, C.SSL_FILETYPE_PEM) <= 0 {
 		return errors.New("Error with SSL_CTX_use_certificate_file")
-    }
+	}
 
-	DEBUG_MESSAGE("Success with SSL_CTX_use_certificate");
+	DEBUG_MESSAGE("Success with SSL_CTX_use_certificate")
 
 	/* set the private key from KeyFile (may be the same as CertFile) */
-    if C.SSL_CTX_use_PrivateKey_file(dtls_data.ssl_ctx,
+	if C.SSL_CTX_use_PrivateKey_file(dtls_data.ssl_ctx,
 		pem_ptr, C.SSL_FILETYPE_PEM) <= 0 {
 		return errors.New("Error with SSL_CTX_use_PrivateKey_file")
-    }
+	}
 
-	DEBUG_MESSAGE("Success with SSL_CTX_use_PrivateKey");
+	DEBUG_MESSAGE("Success with SSL_CTX_use_PrivateKey")
 
 	C.free(unsafe.Pointer(pem_ptr))
 
-    /* verify private key */
-    if C.SSL_CTX_check_private_key(dtls_data.ssl_ctx) == 0 {
+	/* verify private key */
+	if C.SSL_CTX_check_private_key(dtls_data.ssl_ctx) == 0 {
 		return errors.New("Private key does not match the public certificate")
 	}
 
@@ -136,12 +138,12 @@ func (dtls_data *DtlsConnectionData) LoadCertificates() error {
 func (dtls_data *DtlsConnectionData) SetCipherList() error {
 
 	/* SSL_CTX_set_cipher_list() sets the list of available ciphers
-	  (TLSv1.2 and below) for ctx using the control string str. */
+	(TLSv1.2 and below) for ctx using the control string str. */
 
 	/* SRTP is the Secure Real-Time Transport Protocol.
-	  OpenSSL implements support for the "use_srtp" DTLS extension
-	  defined in RFC5764. SSL_CTX_set_tlsext_use_srtp() to set its
-	  use for all SSL objects subsequently created from an SSL_CTX.*/
+	OpenSSL implements support for the "use_srtp" DTLS extension
+	defined in RFC5764. SSL_CTX_set_tlsext_use_srtp() to set its
+	use for all SSL objects subsequently created from an SSL_CTX.*/
 
 	ciphers := GenericCiphers()
 
@@ -164,13 +166,13 @@ func (dtls_data *DtlsConnectionData) SetCipherList() error {
 func (dtls_data *DtlsConnectionData) SSL_CTX_set_read_ahead(choice int) {
 
 	/* SSL_CTX_set_read_ahead set whether we should read as many input bytes
-	  as possible (for non-blocking reads) or not. */
+	as possible (for non-blocking reads) or not. */
 
 	//Same: C.SSL_CTX_set_read_ahead(client.ssl_ctx, choice)
 	C.SSL_CTX_ctrl(dtls_data.ssl_ctx, C.SSL_CTRL_SET_READ_AHEAD,
 		C.long(choice), nil)
 
-	DEBUG_MESSAGE("Success with SSL_CTX_set_read_ahead");
+	DEBUG_MESSAGE("Success with SSL_CTX_set_read_ahead")
 }
 
 func (dtls_data *DtlsConnectionData) SSL_new() error {
@@ -184,7 +186,7 @@ func (dtls_data *DtlsConnectionData) SSL_new() error {
 		return errors.New("Error in SSL_new")
 	}
 
-	DEBUG_MESSAGE("Success with SSL_new");
+	DEBUG_MESSAGE("Success with SSL_new")
 
 	return nil
 }
@@ -220,13 +222,13 @@ func (dtls_data *DtlsConnectionData) SSL_set_bio() error {
 func (dtls_data *DtlsConnectionData) SSL_set_mode() {
 
 	/* SSL_set_mode() adds the mode set via bitmask in mode
-	  to ssl. Options already set before are not cleared.*/
+	to ssl. Options already set before are not cleared.*/
 
 	/* SSL_MODE_ACCEPT_MOVING_WRITE_BUFFER
-	   Make it possible to retry SSL_write() with changed
-	  buffer location (the buffer contents must stay the same).
-	  This is not the default to avoid the misconception that
-	  non-blocking SSL_write() behaves like non-blocking write(). */
+	 Make it possible to retry SSL_write() with changed
+	buffer location (the buffer contents must stay the same).
+	This is not the default to avoid the misconception that
+	non-blocking SSL_write() behaves like non-blocking write(). */
 
 	/* SSL_MODE_ENABLE_PARTIAL_WRITE
 	   Allow SSL_write(..., n) to return r with 0 < r < n
@@ -263,10 +265,10 @@ func (dtls_data *DtlsConnectionData) SSL_set_options() error {
 		return errors.New("Error in EC_KEY_new_by_curve_name")
 	}
 
-	C.SSL_set_options(dtls_data.ssl, C.SSL_OP_SINGLE_ECDH_USE);
+	C.SSL_set_options(dtls_data.ssl, C.SSL_OP_SINGLE_ECDH_USE)
 	//Same: C.SSL_set_tmp_ecdh(client.ssl, ecdh)
 	C.SSL_ctrl(dtls_data.ssl, C.SSL_CTRL_SET_TMP_ECDH, 0, unsafe.Pointer(ecdh))
-	C.EC_KEY_free(ecdh);
+	C.EC_KEY_free(ecdh)
 
 	DEBUG_MESSAGE("Success with SSL_set_options")
 
@@ -405,17 +407,35 @@ func (dtls_data *DtlsConnectionData) SSL_export_keying_material() ([]byte, error
 	return keys, nil
 }
 
+func (dtls_data *DtlsConnectionData) InitKeys() {
+	dtls_data.crypto_rtp = new(CryptoKeys)
+	dtls_data.crypto_rtp.have_session_key = false
+	dtls_data.crypto_rtp.index = 0
+	dtls_data.crypto_rtcp = new(CryptoKeys)
+	dtls_data.crypto_rtcp.have_session_key = false
+	dtls_data.crypto_rtcp.index = 0
+	dtls_data.decrypt = new(CryptoKeys)
+	dtls_data.decrypt.have_session_key = false
+	dtls_data.decrypt.index = 0
+}
+
+func (dtls_data *DtlsConnectionData) CryptoInitMain() {
+	dtls_data.aes_evp = C.EVP_aes_128_ecb()
+}
+
 func (dtls_data *DtlsConnectionData) DtlsSetupCrypto() error {
 	DEBUG_MESSAGE("Dtls_setup_crypto")
 
 	start := 0
 	end := MASTER_KEY_LEN
-	dtls_data.crypto_rtp = new(CryptoKeys)
+
+	dtls_data.InitKeys()
+
 	crypto_rtp := dtls_data.crypto_rtp
-	dtls_data.crypto_rtcp = new(CryptoKeys)
 	crypto_rtcp := dtls_data.crypto_rtcp
-	dtls_data.decrypt = new(CryptoKeys)
 	decrypt := dtls_data.decrypt
+
+	dtls_data.CryptoInitMain() // Generate argument for session key generating
 
 	spp := C.SSL_get_selected_srtp_profile(dtls_data.ssl)
 	if spp == nil {
@@ -464,7 +484,6 @@ func (dtls_data *DtlsConnectionData) DtlsSetupCrypto() error {
 	copy(decrypt.master_salt[:], keys[start:end])
 	DEBUG_MESSAGE_BLOCK("MASTER_SALT for Decrypt", decrypt.master_salt[:])
 
-
 	DEBUG_MESSAGE("DTLS-SRTP successfully negotiated")
 	return nil
 }
@@ -477,18 +496,25 @@ func (client *WebrtcConnection) DtlsProccess(browserAddr *net.UDPAddr, message [
 	dtls_data := client.dtls_data
 
 	if len != 0 {
-		dtls_data.BIO_write(message, len);
+		dtls_data.BIO_write(message, len)
 	}
 
-	ret, err := dtls_data.TryConnect();
+	ret, err := dtls_data.TryConnect()
 
 	if ret == -1 {
 		fmt.Println(err)
 		return err
-	} else if (ret == 1) {
-		DEBUG_MESSAGE("Handshake: Successful");
+	} else if ret == 1 {
+		DEBUG_MESSAGE("Handshake: Successful")
 		err = dtls_data.DtlsSetupCrypto()
-		return err
+
+		if err != nil {
+			return err
+		}
+
+		go StreamController(client.ip_local, client.port_local)
+
+		return nil
 	}
 
 	DEBUG_MESSAGE("Handshake: Wait Read/Write")

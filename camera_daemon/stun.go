@@ -1,45 +1,45 @@
 package main
 
 import (
-	"encoding/hex"
-	"crypto/rand"
-	"encoding/binary"
-	"crypto/sha1"
-	"crypto/hmac"
-	"hash/crc32"
 	"bytes"
+	"crypto/hmac"
+	"crypto/rand"
+	"crypto/sha1"
+	"encoding/binary"
+	"encoding/hex"
 	"fmt"
+	"hash/crc32"
 	"net"
 )
 
 var (
-	HEADER_TYPE = []byte{0x00, 0x01}
-	MAGICK = []byte{0x21, 0x12, 0xA4, 0x42}
-	HEADER_ATTRIBUTE_LENGTH uint16 = 4
-	XOR_MAPPED_ADDRESS_TYPE = []byte{0x00, 0x20}
-	XOR_MAPPED_ADDRESS_LENGTH = []byte{0x00, 0x08}
-	XOR_MAPPED_ADDRESS_IP4 = []byte{0x00, 0x01}
-	MESSAGE_INTEGRITY_TYPE = []byte{0x00, 0x08}
-	MESSAGE_INTEGRITY_LENGTH = []byte{0x00, 0x14}
-	FINGERPRINT_TYPE = []byte{0x80, 0x28}
-	FINGERPRINT_LENGTH = []byte{0x00, 0x04}
-	FINGERPRINT uint32 = 0x5354554e
-	USERNAME_TYPE = []byte{0x00, 0x06}
-	USERNAME_LENGTH = []byte{0x00, 0x09}
-	PADDING uint16 = 3
-	ICE_CONTROLLED_TYPE = []byte{0x80, 0x29}
-	ICE_CONTROLLED_LENGTH = []byte{0x00, 0x08}
-	PRIORITY_TYPE = []byte{0x00, 0x24}
-	PRIORITY_LENGTH = []byte{0x00, 0x04}
-	PRIORITY_VALUE uint32 = 1845501695
-	SOFTWARE_TYPE = []byte{0x80, 0x22}
-	SOFTWARE_VALUE = "webrtpstream-1.0.0"
+	HEADER_TYPE                      = []byte{0x00, 0x01}
+	MAGICK                           = []byte{0x21, 0x12, 0xA4, 0x42}
+	HEADER_ATTRIBUTE_LENGTH   uint16 = 4
+	XOR_MAPPED_ADDRESS_TYPE          = []byte{0x00, 0x20}
+	XOR_MAPPED_ADDRESS_LENGTH        = []byte{0x00, 0x08}
+	XOR_MAPPED_ADDRESS_IP4           = []byte{0x00, 0x01}
+	MESSAGE_INTEGRITY_TYPE           = []byte{0x00, 0x08}
+	MESSAGE_INTEGRITY_LENGTH         = []byte{0x00, 0x14}
+	FINGERPRINT_TYPE                 = []byte{0x80, 0x28}
+	FINGERPRINT_LENGTH               = []byte{0x00, 0x04}
+	FINGERPRINT               uint32 = 0x5354554e
+	USERNAME_TYPE                    = []byte{0x00, 0x06}
+	USERNAME_LENGTH                  = []byte{0x00, 0x09}
+	PADDING                   uint16 = 3
+	ICE_CONTROLLED_TYPE              = []byte{0x80, 0x29}
+	ICE_CONTROLLED_LENGTH            = []byte{0x00, 0x08}
+	PRIORITY_TYPE                    = []byte{0x00, 0x24}
+	PRIORITY_LENGTH                  = []byte{0x00, 0x04}
+	PRIORITY_VALUE            uint32 = 1845501695
+	SOFTWARE_TYPE                    = []byte{0x80, 0x22}
+	SOFTWARE_VALUE                   = "webrtpstream-1.0.0"
 )
 
 func CreateHeader(transaction []byte) []byte {
 	var (
 		request []byte
-		header []byte
+		header  []byte
 	)
 
 	header = append(header, HEADER_TYPE...)
@@ -77,13 +77,13 @@ func XorMappedAddressDecode(buf []byte, index uint16, ip, port *string) uint16 {
 
 func (client *WebrtcConnection) RequestStunServer() error {
 	var (
-		err error
-		request []byte
-		server *net.UDPAddr
+		err         error
+		request     []byte
+		server      *net.UDPAddr
 		transaction []byte
 	)
 
- 	server, err = net.ResolveUDPAddr("udp",
+	server, err = net.ResolveUDPAddr("udp",
 		IP_STUN_SERVER+":"+PORT_STUN_SERVER)
 	if err != nil {
 		fmt.Println(err)
@@ -145,7 +145,7 @@ func stun_xor_mapped(addr net.UDPAddr, body []byte) []byte {
 	port := make([]byte, 2)
 	var RealIP []byte
 
-    binary.BigEndian.PutUint16(port, uint16(addr.Port))
+	binary.BigEndian.PutUint16(port, uint16(addr.Port))
 
 	DEBUG_MESSAGE_BLOCK("IP address:", addr.IP)
 
@@ -287,8 +287,8 @@ func stun_software(body []byte) []byte {
 
 	var (
 		response []byte
-		i uint16 = 0
-		size uint16 = (length_str + 3) & 0xfffc;
+		i        uint16 = 0
+		size     uint16 = (length_str + 3) & 0xfffc
 	)
 
 	length := binary.BigEndian.Uint16(body[2:4])
@@ -297,12 +297,11 @@ func stun_software(body []byte) []byte {
 	binary.BigEndian.PutUint16(body[2:4], length)
 	binary.BigEndian.PutUint16(len_b, size)
 
-
 	response = append(response, SOFTWARE_TYPE...)
 	response = append(response, len_b...)
 	response = append(response, SOFTWARE_VALUE...)
 
-	for ; i < size - length_str; i++ {
+	for ; i < size-length_str; i++ {
 		response = append(response, 0)
 	}
 
@@ -326,16 +325,16 @@ func check_message_integrity(body []byte, pwd string) {
 	h := hmac.New(sha1.New, key)
 	h.Write([]byte(message))
 
-//	fmt.Printf("%s\n", hex.Dump(h.Sum(nil)))
+	//	fmt.Printf("%s\n", hex.Dump(h.Sum(nil)))
 }
 
 func check_fingerprint(buffer []byte) bool {
 	fmt.Println("Check START Fingerprint")
 	crc := make([]byte, 4)
 
-	fmt.Printf("%s\n", hex.Dump(buffer[:len(buffer) - 8]))
+	fmt.Printf("%s\n", hex.Dump(buffer[:len(buffer)-8]))
 
-	body := buffer[:len(buffer) - 8]
+	body := buffer[:len(buffer)-8]
 
 	num := crc32.ChecksumIEEE(body) ^ FINGERPRINT
 	binary.BigEndian.PutUint32(crc, num)
@@ -349,7 +348,7 @@ func check_fingerprint(buffer []byte) bool {
 func (client *WebrtcConnection) SendRequest() error {
 	var (
 		transaction []byte
-		request []byte
+		request     []byte
 	)
 
 	browserAddr, err := net.ResolveUDPAddr("udp",
@@ -380,11 +379,11 @@ func (client *WebrtcConnection) SendRequest() error {
 	return err
 }
 
-func (client *WebrtcConnection) ReceiveResponse(buffer []byte) {
+func (client *WebrtcConnection) ReceiveResponse(buffer []byte) error {
 	var (
 		index uint16 = 20
-		ip string
-		port string
+		ip    string
+		port  string
 	)
 
 	type_attr := []byte{buffer[index], buffer[index+1]}
@@ -397,13 +396,15 @@ func (client *WebrtcConnection) ReceiveResponse(buffer []byte) {
 	if DEBUG_MODE {
 		fmt.Printf("Address from response: %s:%s\n", ip, port)
 	}
+
+	return nil
 }
 
 func (client *WebrtcConnection) SendResponse(buffer []byte,
 	browserAddr *net.UDPAddr) error {
 
 	var (
-		response []byte
+		response    []byte
 		transaction []byte
 	)
 

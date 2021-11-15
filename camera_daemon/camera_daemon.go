@@ -7,12 +7,13 @@ import (
 	"net/http"
 	"os"
 	"time"
+
 	"golang.org/x/net/websocket"
 )
 
 var (
 	DATABASE_PATH = "/etc/camera_server/static/database/database.txt"
-	PUBLIC_MODE bool
+	PUBLIC_MODE   bool
 )
 
 func loadPage(filename string) ([]byte, error) {
@@ -62,9 +63,9 @@ func formHandler(w http.ResponseWriter, r *http.Request) {
 
 func WSClient(ws *websocket.Conn) {
 	var (
-		conn WebrtcConnection
+		conn   WebrtcConnection
 		answer string
-		err error
+		err    error
 	)
 
 	conn.dtls_data = new(DtlsConnectionData)
@@ -100,21 +101,24 @@ func WSClient(ws *websocket.Conn) {
 	for flagICE == false || flagSDP == false {
 		websocket.Message.Receive(ws, &answer)
 		switch answer {
-		case "SDP": {
-			conn.ReceiveSDP(ws)
-			conn.SendSDP(ws)
-			flagSDP = true
-		}
-		case "ICE": {
-			conn.ReceiveICE(ws)
-			conn.SendICE(ws)
-			flagICE = true
-		}
-		case "ERROR":{
-			websocket.Message.Receive(ws, &answer)
-			fmt.Println(answer)
-			return
-		}
+		case "SDP":
+			{
+				conn.ReceiveSDP(ws)
+				conn.SendSDP(ws)
+				flagSDP = true
+			}
+		case "ICE":
+			{
+				conn.ReceiveICE(ws)
+				conn.SendICE(ws)
+				flagICE = true
+			}
+		case "ERROR":
+			{
+				websocket.Message.Receive(ws, &answer)
+				fmt.Println(answer)
+				return
+			}
 
 		default:
 			fmt.Println("Command error")
@@ -131,9 +135,22 @@ func WSClient(ws *websocket.Conn) {
 	}
 
 	go conn.MessageController(done)
-	go StreamController(conn.ip_local, conn.port_local)
-	<- done
+	<-done
 	time.Sleep(3 * time.Second)
+}
+
+func test_PacketIndex() {
+	var index uint64 = 0
+	var seq_num uint16 = 1
+	for i := 0; i < 131072; i += 1 {
+		seq_num = seq_num % 0xFF
+		if seq_num == 0 {
+			seq_num = 1
+		}
+		fmt.Printf("Index = %d\n", index)
+		index = PacketIndex(seq_num, index)
+		seq_num += 1
+	}
 }
 
 func main() {
@@ -151,7 +168,7 @@ func main() {
 	fileServer := http.FileServer(http.Dir("/etc/camera_server/static"))
 	http.Handle("/", fileServer)
 	http.HandleFunc("/login", formHandler)
- 	http.Handle("/ws", websocket.Handler(WSClient))
+	http.Handle("/ws", websocket.Handler(WSClient))
 
 	ffmpeg_connection, err = CreateConnection()
 	if err != nil {
