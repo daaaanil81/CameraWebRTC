@@ -73,7 +73,6 @@ func (client *WebrtcConnection) CreateLocalICE() string {
 	return ice
 }
 
-
 func (client *WebrtcConnection) ParseICE(ice string) error {
 	var err error
 

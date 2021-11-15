@@ -323,7 +323,7 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 				break
 			}
 
-			err = client.SendRequest()
+			err = client.SendRequest(browserAddr)
 
 		} else if bytes.Equal(message[0:2], STUN_RESPONSE) {
 			DEBUG_MESSAGE_BLOCK("Receive STUN Response", message)

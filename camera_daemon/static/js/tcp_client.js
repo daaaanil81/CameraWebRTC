@@ -112,7 +112,7 @@ function sendIceCandidate(event) {
         console.log(event.candidate.candidate);
         var array = event.candidate.candidate.split(' ');
         var ip_address = array[4];
-        if (event.candidate.candidate.indexOf(".local", 0) == -1 && ip_address.substr(0, 3) == '192') {
+        if (event.candidate.candidate.indexOf(".local", 0) == -1) {
             localIce = event.candidate.candidate;
             connection.send("ICE");
             connection.send(event.candidate.candidate);

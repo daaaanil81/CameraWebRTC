@@ -231,6 +231,9 @@ func stun_username(ufrag_s, ufrag_c string, body []byte) []byte {
 
 	username := ufrag_c + ":" + ufrag_s
 
+	fmt.Println("ufrag_c: ", ufrag_c)
+	fmt.Println("ufrag_s: ", ufrag_s)
+
 	response = append(response, USERNAME_TYPE...)
 	response = append(response, USERNAME_LENGTH...)
 	response = append(response, username...)
@@ -345,19 +348,20 @@ func check_fingerprint(buffer []byte) bool {
 	return true
 }
 
-func (client *WebrtcConnection) SendRequest() error {
+func (client *WebrtcConnection) SendRequest(browserAddr *net.UDPAddr) error {
 	var (
 		transaction []byte
 		request     []byte
+		err         error
 	)
 
-	browserAddr, err := net.ResolveUDPAddr("udp",
-		client.ip_client+":"+client.port_client)
-	if err != nil {
-		fmt.Println(err)
+	//browserAddr, err := net.ResolveUDPAddr("udp",
+	//	client.ip_client+":"+client.port_client)
+	//if err != nil {
+	//	fmt.Println(err)
 
-		return err
-	}
+	//	return err
+	//}
 
 	request = CreateHeader(transaction)
 	request = stun_software(request)
