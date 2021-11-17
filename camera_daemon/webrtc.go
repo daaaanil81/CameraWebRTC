@@ -34,6 +34,7 @@ var (
 	STUN_REQUEST             = []byte{0x00, 0x01}
 	RTP_MESSAGE_1            = []byte{0x80, 0x60}
 	RTP_MESSAGE_2            = []byte{0x80, 0xe0}
+	RTCP_MESSAGE             = []byte{0x80, 0xc8}
 	BAD_RESULT               = -1
 	DEBUG_MODE               = true
 	PORT_FFMPEG              = 9011
@@ -339,6 +340,10 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			bytes.Equal(message[0:2], RTP_MESSAGE_2) {
 			DEBUG_MESSAGE("Receive RTP")
 			err = client.RtpToSrtp(message, &sequnce)
+
+		} else if bytes.Equal(message[0:2], RTCP_MESSAGE) {
+			DEBUG_MESSAGE("Receive RTCP")
+			err = client.RtcpToSrtcp(message)
 
 		} else {
 			DEBUG_MESSAGE_BLOCK("Receive DTLS package", message)

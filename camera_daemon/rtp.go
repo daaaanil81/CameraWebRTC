@@ -200,6 +200,38 @@ func (dtls_data *DtlsConnectionData) CheckSessionKeysRtp() error {
 	return nil
 }
 
+func (dtls_data *DtlsConnectionData) CheckSessionKeysRtcp() error {
+
+	crypto_rtcp := dtls_data.crypto_rtcp
+
+	if crypto_rtcp.have_session_key == true {
+		return nil
+	}
+
+	err := crypto_rtcp.CryptoGenSessionKey(dtls_data.aes_evp, 0x03,
+		6, crypto_rtcp.session_key[:])
+	if err != nil {
+		return err
+	}
+
+	err = crypto_rtcp.CryptoGenSessionKey(dtls_data.aes_evp, 0x04,
+		6, crypto_rtcp.session_auth_key[:])
+	if err != nil {
+		return err
+	}
+
+	err = crypto_rtcp.CryptoGenSessionKey(dtls_data.aes_evp, 0x05,
+		6, crypto_rtcp.session_salt[:])
+	if err != nil {
+		return err
+	}
+
+	crypto_rtcp.have_session_key = true
+	crypto_rtcp.AesCmSessionKeyInit(dtls_data.aes_evp)
+
+	return nil
+}
+
 //static int hmac_sha1_rtp(struct crypto_context *c, unsigned char *payload, struct str_key *in, uint64_t index)
 func (keys *CryptoKeys) HmacShaRtp(in []byte, index uint64) []byte {
 	var hmac [20]byte
@@ -207,8 +239,7 @@ func (keys *CryptoKeys) HmacShaRtp(in []byte, index uint64) []byte {
 
 	roc_buf := make([]byte, 4)
 	roc := uint32((index & 0xffffffff0000) >> 16)
-	binary.LittleEndian.PutUint32(roc_buf, roc)
-	//roc = binary.BigEndian.Uint32(roc_buf)
+	binary.BigEndian.PutUint32(roc_buf, roc)
 
 	hc = C.HMAC_CTX_new()
 
@@ -227,7 +258,6 @@ func (keys *CryptoKeys) HmacShaRtp(in []byte, index uint64) []byte {
 func (keys *CryptoKeys) CryptoEncryptRtp(payload, out []byte, ssrc uint32, index uint64) {
 	var iv [16]byte
 	var ivi [4]uint32
-
 	b := make([]byte, 4)
 
 	index <<= 16
@@ -326,6 +356,90 @@ func RtpPayload(buffer []byte, sequnce uint16, ssrc *uint32) error {
 	return nil
 }
 
+func RtcpPayload(buffer []byte) uint32 {
+	v := (buffer[0] & 0xC0) >> 6
+	p := (buffer[0] & 0x20) >> 5
+	x := (buffer[0] & 0x10) >> 4
+	cc := buffer[0] & 0x0F
+	payload_type := buffer[1]
+	length := binary.BigEndian.Uint16(buffer[2:4])
+	ssrc := binary.BigEndian.Uint32(buffer[4:8])
+
+	if DEBUG_MODE {
+		fmt.Println("V = ", v)
+		fmt.Println("P = ", p)
+		fmt.Println("X = ", x)
+		fmt.Println("CC = ", cc)
+		fmt.Println("Length = ", length)
+		/* 1 byte */
+		fmt.Println("Payload type = ", payload_type)
+		/* 2-3 bytes */
+		fmt.Println("SSRC = ", ssrc)
+	}
+
+	return ssrc
+}
+
+func (keys *CryptoKeys) HmacSha1Rtcp(in []byte) []byte {
+
+	var hmac [20]byte
+
+	C.HMAC(C.EVP_sha1(), unsafe.Pointer(&keys.session_auth_key[0]), C.int(SRTP_AUTH_KEY_LEN), (*C.uchar)(&in[0]), C.ulong(len(in)), (*C.uchar)(&hmac[0]), nil)
+
+	out := append(in, hmac[0:SRTP_AUTH_TAG]...)
+	return out
+}
+
+func (client *WebrtcConnection) RtcpToSrtcp(buffer []byte) error {
+	//int rtcp_avp_to_savp(struct crypto_context *crypto_from_camera, unsigned char *rtcp, int* length, uint32_t* index_rtcp)
+
+	var port int = 0
+
+	dtls_data := client.dtls_data
+	crypto_rtcp := dtls_data.crypto_rtcp
+	payload := buffer[8:]
+
+	ssrc := RtcpPayload(buffer)
+
+	err := dtls_data.CheckSessionKeysRtcp()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	crypto_rtcp.CryptoEncryptRtp(payload, payload, ssrc, crypto_rtcp.index)
+
+	index_buffer := make([]byte, 4)
+
+	binary.BigEndian.PutUint32(index_buffer, 0x80000000|uint32(crypto_rtcp.index))
+
+	buffer = append(buffer, index_buffer...)
+
+	crypto_buffer := crypto_rtcp.HmacSha1Rtcp(buffer)
+
+	//idx = (void *) to_auth.str + to_auth.len;
+	//*idx = htonl((0x80000000ULL | *index_rtcp));
+	//to_auth.len += sizeof(*idx);
+	//crypto_from_camera->params.crypto_suite->hash_rtcp(crypto_from_camera, to_auth.str + to_auth.len, &to_auth);
+
+	//to_auth.len += crypto_from_camera->params.crypto_suite->srtcp_auth_tag;
+	//*length = to_auth.len;
+	crypto_rtcp.index += 1
+
+	fmt.Sscan(client.port_client, &port)
+
+	browserAddr := &net.UDPAddr{
+		IP:   net.ParseIP(client.ip_local),
+		Port: port,
+	}
+
+	_, err = client.connectionUDP.WriteToUDP(crypto_buffer, browserAddr)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (client *WebrtcConnection) RtpToSrtp(buffer []byte, sequnce *uint16) error {
 	var ssrc uint32 = 0
 	var port int = 0
@@ -348,19 +462,18 @@ func (client *WebrtcConnection) RtpToSrtp(buffer []byte, sequnce *uint16) error 
 
 	crypto_rtp.index = PacketIndex(*sequnce, crypto_rtp.index)
 
-	DEBUG_MESSAGE_BLOCK("ALL message BEFORE: ", buffer)
+	//DEBUG_MESSAGE_BLOCK("ALL message BEFORE: ", buffer)
 
-	DEBUG_MESSAGE_BLOCK("Payload BEFORE: ", payload)
+	//DEBUG_MESSAGE_BLOCK("Payload BEFORE: ", payload)
 
 	crypto_rtp.CryptoEncryptRtp(payload, payload, ssrc, crypto_rtp.index)
 
-	DEBUG_MESSAGE_BLOCK("Payload AFTER CryptoEncryptRtp: ", payload)
+	//DEBUG_MESSAGE_BLOCK("Payload AFTER CryptoEncryptRtp: ", payload)
 
 	//func (keys *CryptoKeys) HmacShaRtp(in, index uint64) {
 	crypto_buffer := crypto_rtp.HmacShaRtp(buffer, crypto_rtp.index)
 
 	DEBUG_MESSAGE_BLOCK("ALL message AFTER: ", crypto_buffer)
-	//crypto_rtp.
 
 	// crypto_encrypt_rtp(&p_a->crypto, &payload, rtp_h.ssrc, index);
 	// /** Function Hash all mess and add
