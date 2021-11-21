@@ -12,13 +12,19 @@ import "C"
 
 import (
 	"bytes"
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"crypto/sha256"
+	"crypto/tls"
 	"crypto/x509"
 	"encoding/pem"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"net"
+	"path/filepath"
+	"strings"
 	"unsafe"
 )
 
@@ -40,6 +46,84 @@ const (
 var CRT_FILE_PATH = "/etc/camera_server/static/certificate/danil_petrov.crt"
 var KEY_FILE_PATH = "/etc/camera_server/static/certificate/danil_petrov.key"
 var PEM_FILE_PATH = "/etc/camera_server/static/certificate/danil_petrov.pem"
+
+func LoadKeyAndCertificate() (*tls.Certificate, error) {
+	privateKey, err := LoadKey(KEY_FILE_PATH)
+	if err != nil {
+		return nil, err
+	}
+
+	certificate, err := LoadCertificate(CRT_FILE_PATH)
+	if err != nil {
+		return nil, err
+	}
+
+	certificate.PrivateKey = privateKey
+
+	return certificate, nil
+}
+
+func LoadKey(path string) (crypto.PrivateKey, error) {
+	rawData, err := ioutil.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return nil, err
+	}
+
+	block, _ := pem.Decode(rawData)
+	if block == nil || !strings.HasSuffix(block.Type, "PRIVATE KEY") {
+		return nil, errors.New("Error with key has suffix")
+	}
+
+	fmt.Println(block.Type)
+
+	if key, err := x509.ParsePKCS1PrivateKey(block.Bytes); err == nil {
+		return key, nil
+	}
+
+	if key, err := x509.ParsePKCS8PrivateKey(block.Bytes); err == nil {
+		switch key := key.(type) {
+		case *rsa.PrivateKey, *ecdsa.PrivateKey:
+			return key, nil
+		default:
+			return nil, errors.New("Error with key parse PKCS8")
+		}
+	}
+
+	if key, err := x509.ParseECPrivateKey(block.Bytes); err == nil {
+		return key, nil
+	}
+
+	return nil, errors.New("Error with Read key parse ECP")
+}
+
+func LoadCertificate(path string) (*tls.Certificate, error) {
+	rawData, err := ioutil.ReadFile(filepath.Clean(path))
+	if err != nil {
+		return nil, err
+	}
+
+	var certificate tls.Certificate
+
+	for {
+		block, rest := pem.Decode(rawData)
+		if block == nil {
+			break
+		}
+
+		if block.Type != "CERTIFICATE" {
+			return nil, errors.New("Error with read Certificate type")
+		}
+
+		certificate.Certificate = append(certificate.Certificate, block.Bytes)
+		rawData = rest
+	}
+
+	if len(certificate.Certificate) == 0 {
+		return nil, errors.New("Error with read Certificate len")
+	}
+
+	return &certificate, nil
+}
 
 func (client *WebrtcConnection) OpenCert() error {
 
