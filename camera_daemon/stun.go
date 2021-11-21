@@ -352,20 +352,12 @@ func check_fingerprint(buffer []byte) bool {
 	return true
 }
 
-func (client *WebrtcConnection) SendRequest(browserAddr *net.UDPAddr) error {
+func (client *WebrtcConnection) SendRequest() error {
 	var (
 		transaction []byte
 		request     []byte
 		err         error
 	)
-
-	//browserAddr, err := net.ResolveUDPAddr("udp",
-	//	client.ip_client+":"+client.port_client)
-	//if err != nil {
-	//	fmt.Println(err)
-
-	//	return err
-	//}
 
 	request = CreateHeader(transaction)
 	request = stun_software(request)
@@ -377,7 +369,7 @@ func (client *WebrtcConnection) SendRequest(browserAddr *net.UDPAddr) error {
 
 	DEBUG_MESSAGE_BLOCK("Create STUN Request", request)
 
-	_, err = client.connectionUDP.WriteToUDP(request, browserAddr)
+	err = client.WriteToBrowser(request)
 	if err != nil {
 		fmt.Println(err)
 
@@ -426,7 +418,7 @@ func (client *WebrtcConnection) SendResponse(buffer []byte,
 
 	DEBUG_MESSAGE_BLOCK("Create STUN Response", response)
 
-	_, err := client.connectionUDP.WriteToUDP(response, browserAddr)
+	err := client.WriteToBrowser(response)
 	if err != nil {
 		fmt.Println(err)
 	}

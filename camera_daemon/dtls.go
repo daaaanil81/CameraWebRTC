@@ -245,5 +245,7 @@ func (client *WebrtcConnection) DtlsProccess() error {
 	DEBUG_MESSAGE_BLOCK("LocalMasterKey: ", crypto_rtp.master_key[:])
 	DEBUG_MESSAGE_BLOCK("LocalMasterSalt: ", crypto_rtp.master_salt[:])
 
+	go client.StreamController()
+
 	return nil
 }

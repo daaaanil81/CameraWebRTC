@@ -70,6 +70,7 @@ type WebrtcConnection struct {
 	connectionUDP *net.UDPConn
 	cert          *x509.Certificate
 	dtls_data     *DtlsConnectionData
+	webrtc_mutex  sync.Mutex
 	ip_server     string
 	ip_local      string
 	port_local    string
@@ -134,17 +135,17 @@ func CreateConnection() (*net.UDPConn, error) {
 	return connection, err
 }
 
-func StreamController(ip_address, port_str string) {
+func (client *WebrtcConnection) WriteToBrowser(buffer []byte) error {
+	client.webrtc_mutex.Lock()
+	_, err := client.connectionUDP.Write(buffer)
+	client.webrtc_mutex.Unlock()
 
-	var port int
+	return err
+}
+
+func (client *WebrtcConnection) StreamController() {
+	var sequence uint16 = 1
 	buffer := make([]byte, 0x10000)
-
-	fmt.Sscan(port_str, &port)
-
-	addr := &net.UDPAddr{
-		IP:   net.ParseIP(ip_address),
-		Port: port,
-	}
 
 	Lock := func() {
 		ffmpeg_mutex.Lock()
@@ -158,29 +159,34 @@ func StreamController(ip_address, port_str string) {
 
 	for {
 		Lock()
-
 		n, _, err := ffmpeg_connection.ReadFromUDP(buffer)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
+		UnLock()
 
 		if n == 0 {
 			continue
 		}
 
-		//		DEBUG_MESSAGE_BLOCK("RTP Stream", buffer[:n])
+		if bytes.Equal(buffer[0:2], RTP_MESSAGE_1) ||
+			bytes.Equal(buffer[0:2], RTP_MESSAGE_2) {
+			DEBUG_MESSAGE("Receive RTP")
+			err = client.RtpToSrtp(buffer[:n], &sequence)
+		} else if bytes.Equal(buffer[0:2], RTCP_MESSAGE_1) {
+			DEBUG_MESSAGE("Receive RTCP")
+			err = client.RtcpToSrtcp(buffer[:n])
+		}
 
-		_, err = ffmpeg_connection.WriteToUDP(buffer[:n], addr)
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
 
-		UnLock()
 	}
 
-	defer DEBUG_MESSAGE("StreamController was finished, Port: " + port_str)
+	defer DEBUG_MESSAGE("StreamController was finished")
 }
 
 func (client *WebrtcConnection) OpenConnection() error {
@@ -293,8 +299,6 @@ func (client *WebrtcConnection) SendICE(ws *websocket.Conn) error {
 }
 
 func (client *WebrtcConnection) MessageController(done chan bool) {
-	//var sequnce uint16 = 1
-
 	buffer := make([]byte, 0x10000)
 	dtls_flag := false
 
@@ -323,7 +327,7 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 				break
 			}
 
-			err = client.SendRequest(browserAddr)
+			err = client.SendRequest()
 
 		} else if bytes.Equal(message[0:2], STUN_RESPONSE) {
 			DEBUG_MESSAGE_BLOCK("Receive STUN Response", message)
@@ -336,13 +340,6 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 				dtls_flag = true
 			}
 
-		} else if dtls_flag == true && (bytes.Equal(message[0:2], RTP_MESSAGE_1) ||
-			bytes.Equal(message[0:2], RTP_MESSAGE_2)) {
-			DEBUG_MESSAGE("Receive RTP")
-			//err = client.RtpToSrtp(message, &sequnce)
-		} else if bytes.Equal(message[0:2], RTCP_MESSAGE_1) {
-			DEBUG_MESSAGE("Receive RTCP")
-			//err = client.RtcpToSrtcp(message)
 		} else if bytes.Equal(message[0:2], RTCP_MESSAGE_2) {
 			DEBUG_MESSAGE("Receive RTCP from browser")
 		} else {

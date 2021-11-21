@@ -17,7 +17,6 @@ import (
 	"crypto/sha1"
 	"encoding/binary"
 	"fmt"
-	"net"
 )
 
 var (
@@ -818,7 +817,6 @@ func RtpPayload(buffer []byte, sequnce uint16) uint32 {
 }
 
 func (client *WebrtcConnection) RtcpToSrtcp(buffer []byte) error {
-	var port int
 	var hash_sha []byte
 
 	dtls_data := client.dtls_data
@@ -878,14 +876,7 @@ func (client *WebrtcConnection) RtcpToSrtcp(buffer []byte) error {
 	////*length = to_auth.len;
 	crypto_rtcp.index += 1
 
-	fmt.Sscan(client.port_client, &port)
-
-	browserAddr := &net.UDPAddr{
-		IP:   net.ParseIP(client.ip_local),
-		Port: port,
-	}
-
-	_, err = client.connectionUDP.WriteToUDP(crypto_buffer, browserAddr)
+	err = client.WriteToBrowser(crypto_buffer)
 	if err != nil {
 		return err
 	}
@@ -893,8 +884,54 @@ func (client *WebrtcConnection) RtcpToSrtcp(buffer []byte) error {
 	return nil
 }
 
+// func (s *srtpSSRCState) nextRolloverCount(sequenceNumber uint16) (uint32, func()) {
+// 	seq := int32(sequenceNumber)
+// 	localRoc := uint32(s.index >> 16)
+// 	localSeq := int32(s.index & (seqNumMax - 1))
+
+// 	guessRoc := localRoc
+// 	var difference int32 = 0
+
+// 	if s.rolloverHasProcessed {
+// 		// When localROC is equal to 0, and entering seq-localSeq > seqNumMedian
+// 		// judgment, it will cause guessRoc calculation error
+// 		if s.index > seqNumMedian {
+// 			if localSeq < seqNumMedian {
+// 				if seq-localSeq > seqNumMedian {
+// 					guessRoc = localRoc - 1
+// 					difference = seq - localSeq - seqNumMax
+// 				} else {
+// 					guessRoc = localRoc
+// 					difference = seq - localSeq
+// 				}
+// 			} else {
+// 				if localSeq-seqNumMedian > seq {
+// 					guessRoc = localRoc + 1
+// 					difference = seq - localSeq + seqNumMax
+// 				} else {
+// 					guessRoc = localRoc
+// 					difference = seq - localSeq
+// 				}
+// 			}
+// 		} else {
+// 			// localRoc is equal to 0
+// 			difference = seq - localSeq
+// 		}
+// 	}
+
+// 	return guessRoc, func() {
+// 		if !s.rolloverHasProcessed {
+// 			s.index |= uint64(sequenceNumber)
+// 			s.rolloverHasProcessed = true
+// 			return
+// 		}
+// 		if difference > 0 {
+// 			s.index += uint64(difference)
+// 		}
+// 	}
+// }
+
 func (client *WebrtcConnection) RtpToSrtp(buffer []byte, sequnce *uint16) error {
-	var port int
 	var hash_sha []byte
 
 	dtls_data := client.dtls_data
@@ -935,14 +972,7 @@ func (client *WebrtcConnection) RtpToSrtp(buffer []byte, sequnce *uint16) error 
 
 	*sequnce += 1
 
-	fmt.Sscan(client.port_client, &port)
-
-	browseraddr := &net.UDPAddr{
-		IP:   net.ParseIP(client.ip_local),
-		Port: port,
-	}
-
-	_, err = client.connectionUDP.WriteToUDP(crypto_buffer, browseraddr)
+	err = client.WriteToBrowser(crypto_buffer)
 	if err != nil {
 		fmt.Println(err)
 		return err
