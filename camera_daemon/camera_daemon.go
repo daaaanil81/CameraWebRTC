@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/tls"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -8,13 +9,76 @@ import (
 	"os"
 	"time"
 
+	"github.com/pion/dtls/v2"
 	"golang.org/x/net/websocket"
 )
 
 var (
-	DATABASE_PATH = "/etc/camera_server/static/database/database.txt"
-	PUBLIC_MODE   bool
+	DATABASE_PATH       = "/etc/camera_server/static/database/database.txt"
+	PUBLIC_MODE         bool
+	EXTRACTOR_DTLS_SRTP = "EXTRACTOR-dtls_srtp"
+	MASTER_KEY_LEN      = 16
+	MASTER_SALT_LEN     = 14
 )
+
+func (client *WebrtcConnection) dtls() {
+
+	certificate, err := LoadKeyAndCertificate()
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+
+	// Prepare the configuration of the DTLS connection
+	config := &dtls.Config{
+		Certificates: []tls.Certificate{*certificate},
+		SRTPProtectionProfiles: []dtls.SRTPProtectionProfile{
+			dtls.SRTP_AES128_CM_HMAC_SHA1_80},
+		InsecureSkipVerify: true,
+	}
+
+	fmt.Println("Opened certificate")
+
+	dtlsConn, err := dtls.Client(client.connectionUDP, config)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println("Client connection")
+
+	srtpProfile, ok := dtlsConn.SelectedSRTPProtectionProfile()
+	if !ok {
+		fmt.Println("Error with Selected SRTP Protection Profile DTLS[MISTAKE]")
+		return
+	}
+
+	switch srtpProfile {
+	case dtls.SRTP_AEAD_AES_128_GCM:
+		fmt.Println("Choose SRTP_AEAD_AES_128_GCM")
+	case dtls.SRTP_AES128_CM_HMAC_SHA1_80:
+		fmt.Println("Choose ProtectionProfileAes128CmHmacSha1_80")
+	default:
+		fmt.Println("Error with DTLS[MISTAKE]")
+	}
+
+	connState := dtlsConn.ConnectionState()
+
+	keyingMaterial, err := connState.ExportKeyingMaterial(EXTRACTOR_DTLS_SRTP, nil, (MASTER_KEY_LEN*2)+(MASTER_SALT_LEN*2))
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	offset := 0
+	clientWriteKey := append([]byte{}, keyingMaterial[offset:offset+MASTER_KEY_LEN]...)
+	offset += 2 * MASTER_KEY_LEN
+	clientWriteKey = append(clientWriteKey, keyingMaterial[offset:offset+MASTER_SALT_LEN]...)
+	offset += MASTER_SALT_LEN
+
+	fmt.Printf("LocalMasterKey: % x02\n", clientWriteKey[0:MASTER_KEY_LEN])
+	fmt.Printf("LocalMasterKey: % x02\n", clientWriteKey[MASTER_KEY_LEN:])
+}
 
 func loadPage(filename string) ([]byte, error) {
 	body, err := ioutil.ReadFile(filename)
