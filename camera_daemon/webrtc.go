@@ -15,6 +15,7 @@ import (
 	"crypto/cipher"
 	"crypto/x509"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"hash"
 	"math/rand"
@@ -26,6 +27,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/pion/dtls/v2"
 	"golang.org/x/net/websocket"
 )
 
@@ -46,7 +48,6 @@ var (
 )
 
 type CryptoKeys struct {
-	ctx              *C.EVP_CIPHER_CTX
 	have_session_key bool
 	index            uint64
 	master_key       [MASTER_KEY_LEN]byte
@@ -59,14 +60,10 @@ type CryptoKeys struct {
 }
 
 type DtlsConnectionData struct {
-	ssl_ctx     *C.SSL_CTX
-	ssl         *C.SSL
-	r_bio       *C.BIO
-	w_bio       *C.BIO
 	crypto_rtp  *CryptoKeys // Crypto RTP message for browser  \ SAME
 	crypto_rtcp *CryptoKeys // Crypto RTCP message for browser / SAME
 	decrypt     *CryptoKeys // Decrypto RTP and RTCP from browser
-	//aes_evp     *C.EVP_CIPHER
+	dtlsConn    *dtls.Conn
 }
 
 type WebrtcConnection struct {
@@ -298,10 +295,10 @@ func (client *WebrtcConnection) SendICE(ws *websocket.Conn) error {
 }
 
 func (client *WebrtcConnection) MessageController(done chan bool) {
+	//var sequnce uint16 = 1
 
 	buffer := make([]byte, 0x10000)
 	dtls_flag := false
-	var sequnce uint16 = 1
 
 	for {
 		n, browserAddr, err := client.connectionUDP.ReadFromUDP(buffer)
@@ -336,27 +333,22 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			err = client.ReceiveResponse(message)
 
 			if dtls_flag == false {
-				err = client.DtlsProccess(browserAddr, []byte{}, 0)
+				client.dtls_data.InitKeys()
+				err = client.DtlsProccess()
 				dtls_flag = true
 			}
 
-		} else if bytes.Equal(message[0:2], RTP_MESSAGE_1) ||
-			bytes.Equal(message[0:2], RTP_MESSAGE_2) {
+		} else if dtls_flag == true && (bytes.Equal(message[0:2], RTP_MESSAGE_1) ||
+			bytes.Equal(message[0:2], RTP_MESSAGE_2)) {
 			DEBUG_MESSAGE("Receive RTP")
-			err = client.RtpToSrtp(message, &sequnce)
-
+			//err = client.RtpToSrtp(message, &sequnce)
 		} else if bytes.Equal(message[0:2], RTCP_MESSAGE_1) {
 			DEBUG_MESSAGE("Receive RTCP")
-			err = client.RtcpToSrtcp(message)
-
+			//err = client.RtcpToSrtcp(message)
 		} else if bytes.Equal(message[0:2], RTCP_MESSAGE_2) {
 			DEBUG_MESSAGE("Receive RTCP from browser")
-			//err = client.RtcpToSrtcp(message)
-
 		} else {
-			DEBUG_MESSAGE_BLOCK("Receive DTLS package", message)
-
-			err = client.DtlsProccess(browserAddr, message, n)
+			err = errors.New("Uknown package")
 		}
 
 		if err != nil {
@@ -376,26 +368,7 @@ func (client *WebrtcConnection) CloseAll() {
 	}
 
 	dtls_data := client.dtls_data
-
-	if dtls_data.r_bio != nil {
-		C.BIO_free(dtls_data.r_bio)
-		fmt.Println("r_bio was cleaned")
-	}
-
-	if dtls_data.w_bio != nil {
-		C.BIO_free(dtls_data.w_bio)
-		fmt.Println("w_bio was cleaned")
-	}
-
-	// if dtls_data.ssl != nil {
-	// 	C.SSL_free(dtls_data.ssl)
-	// 	fmt.Println("ssl was cleaned")
-	// }
-
-	if dtls_data.ssl_ctx != nil {
-		C.SSL_CTX_free(dtls_data.ssl_ctx)
-		fmt.Println("ssl_ctx was cleaned")
-	}
+	dtls_data.dtlsConn.Close()
 }
 
 func SetupCloseHandler(client *WebrtcConnection) {
