@@ -139,19 +139,19 @@ func WSClient(ws *websocket.Conn) {
 	time.Sleep(3 * time.Second)
 }
 
-func test_PacketIndex() {
-	var index uint64 = 0
-	var seq_num uint16 = 1
-	for i := 0; i < 131072; i += 1 {
-		seq_num = seq_num % 0xFF
-		if seq_num == 0 {
-			seq_num = 1
-		}
-		fmt.Printf("Index = %d\n", index)
-		index = PacketIndex(seq_num, index)
-		seq_num += 1
-	}
-}
+// func test_PacketIndex() {
+// 	var index uint64 = 0
+// 	var seq_num uint16 = 1
+// 	for i := 0; i < 131072; i += 1 {
+// 		seq_num = seq_num % 0xFF
+// 		if seq_num == 0 {
+// 			seq_num = 1
+// 		}
+// 		fmt.Printf("Index = %d\n", index)
+// 		index = PacketIndex(seq_num, index)
+// 		seq_num += 1
+// 	}
+// }
 
 func main() {
 	var err error

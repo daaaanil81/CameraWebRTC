@@ -12,9 +12,11 @@ import "C"
 
 import (
 	"bytes"
+	"crypto/cipher"
 	"crypto/x509"
 	"encoding/hex"
 	"fmt"
+	"hash"
 	"math/rand"
 	"net"
 	"os"
@@ -34,7 +36,8 @@ var (
 	STUN_REQUEST             = []byte{0x00, 0x01}
 	RTP_MESSAGE_1            = []byte{0x80, 0x60}
 	RTP_MESSAGE_2            = []byte{0x80, 0xe0}
-	RTCP_MESSAGE             = []byte{0x80, 0xc8}
+	RTCP_MESSAGE_1           = []byte{0x80, 0xc8}
+	RTCP_MESSAGE_2           = []byte{0x81, 0xc9}
 	BAD_RESULT               = -1
 	DEBUG_MODE               = true
 	PORT_FFMPEG              = 9011
@@ -50,8 +53,9 @@ type CryptoKeys struct {
 	master_salt      [MASTER_SALT_LEN]byte
 	session_auth_key [SRTP_AUTH_KEY_LEN]byte
 	session_key      [SESSION_KEY_LEN]byte
-	session_key_ctx  *C.EVP_CIPHER_CTX
 	session_salt     [SESSION_SALT_LEN]byte
+	session_cipher   cipher.Block
+	hash_sha         hash.Hash
 }
 
 type DtlsConnectionData struct {
@@ -59,10 +63,10 @@ type DtlsConnectionData struct {
 	ssl         *C.SSL
 	r_bio       *C.BIO
 	w_bio       *C.BIO
-	aes_evp     *C.EVP_CIPHER
 	crypto_rtp  *CryptoKeys // Crypto RTP message for browser  \ SAME
 	crypto_rtcp *CryptoKeys // Crypto RTCP message for browser / SAME
 	decrypt     *CryptoKeys // Decrypto RTP and RTCP from browser
+	//aes_evp     *C.EVP_CIPHER
 }
 
 type WebrtcConnection struct {
@@ -341,9 +345,13 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 			DEBUG_MESSAGE("Receive RTP")
 			err = client.RtpToSrtp(message, &sequnce)
 
-		} else if bytes.Equal(message[0:2], RTCP_MESSAGE) {
+		} else if bytes.Equal(message[0:2], RTCP_MESSAGE_1) {
 			DEBUG_MESSAGE("Receive RTCP")
 			err = client.RtcpToSrtcp(message)
+
+		} else if bytes.Equal(message[0:2], RTCP_MESSAGE_2) {
+			DEBUG_MESSAGE("Receive RTCP from browser")
+			//err = client.RtcpToSrtcp(message)
 
 		} else {
 			DEBUG_MESSAGE_BLOCK("Receive DTLS package", message)

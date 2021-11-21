@@ -419,10 +419,6 @@ func (dtls_data *DtlsConnectionData) InitKeys() {
 	dtls_data.decrypt.index = 0
 }
 
-func (dtls_data *DtlsConnectionData) CryptoInitMain() {
-	dtls_data.aes_evp = C.EVP_aes_128_ecb()
-}
-
 func (dtls_data *DtlsConnectionData) DtlsSetupCrypto() error {
 	DEBUG_MESSAGE("Dtls_setup_crypto")
 
@@ -434,8 +430,6 @@ func (dtls_data *DtlsConnectionData) DtlsSetupCrypto() error {
 	crypto_rtp := dtls_data.crypto_rtp
 	crypto_rtcp := dtls_data.crypto_rtcp
 	decrypt := dtls_data.decrypt
-
-	dtls_data.CryptoInitMain() // Generate argument for session key generating
 
 	spp := C.SSL_get_selected_srtp_profile(dtls_data.ssl)
 	if spp == nil {
