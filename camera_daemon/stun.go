@@ -127,6 +127,10 @@ func (client *WebrtcConnection) ResponseStunServer() error {
 		}
 	}
 
+	if PUBLIC_MODE == false {
+		client.ip_server = client.ip_local
+	}
+
 	DEBUG_MESSAGE_BLOCK("STUN response from Google", buffer[:n])
 
 	return nil

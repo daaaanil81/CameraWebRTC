@@ -213,8 +213,6 @@ func (client *WebrtcConnection) OpenConnection() error {
 		client.port_local = localAddr[index+1:]
 	}
 
-	//	client.connectionUDP.SetReadDeadline(time.Now().Add(time.Second * 5))
-
 	return err
 }
 
@@ -361,14 +359,15 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 }
 
 func (client *WebrtcConnection) CloseAll() {
+	dtls_data := client.dtls_data
+
 	if client.connectionUDP != nil {
 		fmt.Println("Closing socket " + client.connectionUDP.LocalAddr().String())
 
-		client.connectionUDP.Close()
+		dtls_data.dtlsConn.Close()
+		//client.connectionUDP.Close()
 	}
 
-	dtls_data := client.dtls_data
-	dtls_data.dtlsConn.Close()
 }
 
 func SetupCloseHandler(client *WebrtcConnection) {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"time"
@@ -128,6 +129,24 @@ func WSClient(ws *websocket.Conn) {
 	}
 
 	fmt.Println("Exchange finished")
+
+	conn.connectionUDP.Close()
+
+	laddr, _ := net.ResolveUDPAddr("udp",
+		conn.ip_server+":"+conn.port_server)
+
+	fmt.Println("Laddr: ", conn.ip_server, ":", conn.port_server)
+
+	raddr, _ := net.ResolveUDPAddr("udp",
+		conn.ip_client+":"+conn.port_client)
+
+	fmt.Println("Raddr: ", conn.ip_client, ":", conn.port_client)
+
+	conn.connectionUDP, err = net.DialUDP("udp", laddr, raddr)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
 	go conn.MessageController(done)
 	<-done
