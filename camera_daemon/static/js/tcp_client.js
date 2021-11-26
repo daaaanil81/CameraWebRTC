@@ -18,8 +18,12 @@ var options = {
 var flag_ICE = true;
 var flag_Connection = false;
 
+remoteVideo.addEventListener('loadedmetadata', function() {
+    console.log(`Remote video videoWidth: ${this.videoWidth}px,  videoHeight: ${this.videoHeight}px`);
+});
+
 //var connection = new WebSocket('wss://109.86.197.114:45000/ws');
-var connection = new WebSocket('wss://127.0.0.1:8080/ws');
+var connection = new WebSocket('wss://172.28.202.28:8080/ws');
 
 connection.onerror = function() {
     console.log("Connection...");
@@ -43,6 +47,7 @@ connection.onmessage = function(event) {
         connectionRTC.onicecandidate = sendIceCandidate;
         connectionRTC.createOffer(setLocalDescription, onError, options);
         connectionRTC.addEventListener('track', gotRemoteStream);
+        //connectionRTC.ontrack = gotRemoteStream;
         connectionRTC.addEventListener('iceconnectionstatechange', e => onIceStateChange(connectionRTC, e));
     }
 
@@ -99,6 +104,9 @@ function gotRemoteStream(e) {
         remoteVideo.srcObject = e.streams[0];
         console.log('pc2 received remote stream');
     }
+    remoteVideo.autoplay = true;
+    remoteVideo.muted = true;
+    remoteVideo.play();
 }
 
 function onError() {

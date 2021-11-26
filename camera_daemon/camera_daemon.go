@@ -148,6 +148,14 @@ func WSClient(ws *websocket.Conn) {
 		return
 	}
 
+	// cmd := exec.Command("cvlc", "-vvv", "v4l2:///dev/video0:width=640:height=480:fps=30", "--sout-x264-preset", "ultrafast", "--sout-x264-tune", "film ", "--sout-transcode-threads", "8", "--no-sout-x264-interlaced", "--sout-x264-keyint", "-1", "--sout-x264-lookahead", "100", "--no-audio", "--sout-x264-vbv-maxrate", "6000", "--sout-x264-weightb", "--sout-x264-weightp=0", "--sout-x264-vbv-bufsize", "6000", "--sout", "'#transcode{vcodec=h264,vb=2000}:rtp{dst=127.0.0.1,port=10011,sdp=file:///home/user/test.sdp}'")
+
+	// err = cmd.Run()
+	// if err != nil {
+	// 	log.Fatal("Error", err)
+	// 	return
+	// }
+
 	go conn.MessageController(done)
 	<-done
 	time.Sleep(3 * time.Second)
@@ -170,18 +178,31 @@ func main() {
 	http.HandleFunc("/login", formHandler)
 	http.Handle("/ws", websocket.Handler(WSClient))
 
-	ffmpeg_connection, err = CreateConnection()
+	ffmpeg_connection_rtp, err = CreateConnection(PORT_RTP)
 	if err != nil {
 		return
 	}
 
-	CloseFfmpeg := func() {
-		ffmpeg_mutex.Lock()
-		ffmpeg_connection.Close()
-		ffmpeg_mutex.Unlock()
+	CloseFfmpegRTP := func() {
+		ffmpeg_mutex_rtp.Lock()
+		ffmpeg_connection_rtp.Close()
+		ffmpeg_mutex_rtp.Unlock()
 	}
 
-	defer CloseFfmpeg()
+	defer CloseFfmpegRTP()
+
+	ffmpeg_connection_rtcp, err = CreateConnection(PORT_RTCP)
+	if err != nil {
+		return
+	}
+
+	CloseFfmpegRTCP := func() {
+		ffmpeg_mutex_rtcp.Lock()
+		ffmpeg_connection_rtcp.Close()
+		ffmpeg_mutex_rtcp.Unlock()
+	}
+
+	defer CloseFfmpegRTCP()
 
 	fmt.Printf("Starting server at port 8080\n")
 	if err := http.ListenAndServeTLS(":8080",

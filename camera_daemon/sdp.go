@@ -1,9 +1,9 @@
 package main
 
 import (
-	"strings"
-	"fmt"
 	"errors"
+	"fmt"
+	"strings"
 )
 
 var SDP_PATH = "/etc/camera_server/camera.sdp"
@@ -17,27 +17,27 @@ var ATTRIBUTE_S = "s=Live Stream"
 var ATTRIBUTE_T = "t=0 0"
 
 var (
-	ATTRIBUTE_M = "m=video"
+	ATTRIBUTE_M             = "m=video"
 	ATTRIBUTE_M_PAYLOAD_102 = "102"
-	ATTRIBUTE_M_RTP_SAVP = "RTP/SAVP"
+	ATTRIBUTE_M_RTP_SAVP    = "RTP/SAVP"
 )
 
 var ATTRIBUTE_C = "c=IN IP4"
 
 var (
-	ATTRIBUTE_A_MID = "a=mid:0"
-	ATTRIBUTE_A_TOOL = "a=tool"
-	ATTRIBUTE_A_RTCP = "a=rtcp:"
-	ATTRIBUTE_A_ICE_PWD = "a=ice-pwd:"
-	ATTRIBUTE_A_ICE_UFRAG = "a=ice-ufrag:"
-	ATTRIBUTE_A_RTCP_IP4 = "IN IP4"
-	ATTRIBUTE_A_SENDONLY = "a=sendonly"
-	ATTRIBUTE_A_RTCP_MUX = "a=rtcp-mux"
-	ATTRIBUTE_A_SETUP_ACTIVE = "a=setup:active"
-	ATTRIBUTE_A_ICE_OPTIONS = "a=ice-options:trickle"
+	ATTRIBUTE_A_MID                 = "a=mid:0"
+	ATTRIBUTE_A_TOOL                = "a=tool"
+	ATTRIBUTE_A_RTCP                = "a=rtcp:"
+	ATTRIBUTE_A_ICE_PWD             = "a=ice-pwd:"
+	ATTRIBUTE_A_ICE_UFRAG           = "a=ice-ufrag:"
+	ATTRIBUTE_A_RTCP_IP4            = "IN IP4"
+	ATTRIBUTE_A_SENDONLY            = "a=sendonly"
+	ATTRIBUTE_A_RTCP_MUX            = "a=rtcp-mux"
+	ATTRIBUTE_A_SETUP_ACTIVE        = "a=setup:active"
+	ATTRIBUTE_A_ICE_OPTIONS         = "a=ice-options:trickle"
 	ATTRIBUTE_A_FINGERPRINT_SHA_256 = "a=fingerprint:sha-256"
-	ATTRIBUTE_A_RTPMAP = "a=rtpmap:" + ATTRIBUTE_M_PAYLOAD_102 + " H264/90000"
-	ATTRIBUTE_A_FMTP = "a=fmtp:" + ATTRIBUTE_M_PAYLOAD_102 +
+	ATTRIBUTE_A_RTPMAP              = "a=rtpmap:" + ATTRIBUTE_M_PAYLOAD_102 + " H264/90000"
+	ATTRIBUTE_A_FMTP                = "a=fmtp:" + ATTRIBUTE_M_PAYLOAD_102 +
 		" packetization-mode=1"
 )
 
@@ -64,6 +64,8 @@ func append_attribute_M(sdpLines *[]string, port string) {
 		ATTRIBUTE_M_RTP_SAVP + " " + ATTRIBUTE_M_PAYLOAD_102
 
 	*sdpLines = append(*sdpLines, line)
+	*sdpLines = append(*sdpLines, "b=AS:1000")
+	*sdpLines = append(*sdpLines, "b=RR:0")
 }
 
 func append_attribute_C(sdpLines *[]string, ip string) {
@@ -86,7 +88,7 @@ func append_attribute_A(sdpLines *[]string, ip, port,
 
 	*sdpLines = append(*sdpLines, ATTRIBUTE_A_ICE_OPTIONS)
 	*sdpLines = append(*sdpLines,
-		ATTRIBUTE_A_FINGERPRINT_SHA_256 + " " + fingerprint)
+		ATTRIBUTE_A_FINGERPRINT_SHA_256+" "+fingerprint)
 	*sdpLines = append(*sdpLines, ATTRIBUTE_A_SETUP_ACTIVE)
 	*sdpLines = append(*sdpLines, ATTRIBUTE_A_MID)
 	*sdpLines = append(*sdpLines, ATTRIBUTE_A_SENDONLY)
@@ -146,7 +148,7 @@ func (client *WebrtcConnection) parseSDP(client_sdp string) error {
 		return errors.New("Don't found '" + END_LINE + "'")
 	}
 
-	client.ice_pwd_c = client_sdp[start+len(ATTRIBUTE_A_ICE_PWD):start+end]
+	client.ice_pwd_c = client_sdp[start+len(ATTRIBUTE_A_ICE_PWD) : start+end]
 
 	fmt.Println("ICE_PWD of client: ", client.ice_pwd_c)
 

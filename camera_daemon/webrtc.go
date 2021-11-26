@@ -32,19 +32,22 @@ import (
 )
 
 var (
-	IP_STUN_SERVER    string = "108.177.15.127"
-	PORT_STUN_SERVER  string = "19302"
-	STUN_RESPONSE            = []byte{0x01, 0x01}
-	STUN_REQUEST             = []byte{0x00, 0x01}
-	RTP_MESSAGE_1            = []byte{0x80, 0x60}
-	RTP_MESSAGE_2            = []byte{0x80, 0xe0}
-	RTCP_MESSAGE_1           = []byte{0x80, 0xc8}
-	RTCP_MESSAGE_2           = []byte{0x81, 0xc9}
-	BAD_RESULT               = -1
-	DEBUG_MODE               = true
-	PORT_FFMPEG              = 9011
-	ffmpeg_mutex      sync.Mutex
-	ffmpeg_connection *net.UDPConn
+	IP_STUN_SERVER         string = "108.177.15.127"
+	PORT_STUN_SERVER       string = "19302"
+	STUN_RESPONSE                 = []byte{0x01, 0x01}
+	STUN_REQUEST                  = []byte{0x00, 0x01}
+	RTP_MESSAGE_1                 = []byte{0x80, 0x60}
+	RTP_MESSAGE_2                 = []byte{0x80, 0xe0}
+	RTCP_MESSAGE_1                = []byte{0x80, 0xc8}
+	RTCP_MESSAGE_2                = []byte{0x81, 0xc9}
+	BAD_RESULT                    = -1
+	DEBUG_MODE                    = false
+	PORT_RTP                      = 10011
+	PORT_RTCP                     = 10012
+	ffmpeg_mutex_rtp       sync.Mutex
+	ffmpeg_mutex_rtcp      sync.Mutex
+	ffmpeg_connection_rtp  *net.UDPConn
+	ffmpeg_connection_rtcp *net.UDPConn
 )
 
 type CryptoKeys struct {
@@ -121,10 +124,10 @@ func RandStringRunes(n int) string {
 	return string(b)
 }
 
-func CreateConnection() (*net.UDPConn, error) {
+func CreateConnection(port int) (*net.UDPConn, error) {
 	connection, err := net.ListenUDP("udp", &net.UDPAddr{
 		IP:   net.ParseIP("0.0.0.0"),
-		Port: PORT_FFMPEG,
+		Port: port,
 	})
 
 	if err != nil {
@@ -143,28 +146,18 @@ func (client *WebrtcConnection) WriteToBrowser(buffer []byte) error {
 	return err
 }
 
-func (client *WebrtcConnection) StreamController() {
+func (client *WebrtcConnection) StreamControllerRTP() {
 	var sequence uint16 = 1
 	buffer := make([]byte, 0x10000)
 
-	Lock := func() {
-		ffmpeg_mutex.Lock()
-		//		DEBUG_MESSAGE("Locked")
-	}
-
-	UnLock := func() {
-		ffmpeg_mutex.Unlock()
-		//		DEBUG_MESSAGE("Unlocked")
-	}
-
 	for {
-		Lock()
-		n, _, err := ffmpeg_connection.ReadFromUDP(buffer)
+		ffmpeg_mutex_rtp.Lock()
+		n, _, err := ffmpeg_connection_rtp.ReadFromUDP(buffer)
+		ffmpeg_mutex_rtp.Unlock()
 		if err != nil {
 			fmt.Println(err)
 			break
 		}
-		UnLock()
 
 		if n == 0 {
 			continue
@@ -174,7 +167,35 @@ func (client *WebrtcConnection) StreamController() {
 			bytes.Equal(buffer[0:2], RTP_MESSAGE_2) {
 			DEBUG_MESSAGE("Receive RTP")
 			err = client.RtpToSrtp(buffer[:n], &sequence)
-		} else if bytes.Equal(buffer[0:2], RTCP_MESSAGE_1) {
+		}
+
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+
+	}
+
+	defer DEBUG_MESSAGE("StreamControllerRTP was finished")
+}
+
+func (client *WebrtcConnection) StreamControllerRTCP() {
+	buffer := make([]byte, 0x10000)
+
+	for {
+		ffmpeg_mutex_rtcp.Lock()
+		n, _, err := ffmpeg_connection_rtcp.ReadFromUDP(buffer)
+		ffmpeg_mutex_rtcp.Unlock()
+		if err != nil {
+			fmt.Println(err)
+			break
+		}
+
+		if n == 0 {
+			continue
+		}
+
+		if bytes.Equal(buffer[0:2], RTCP_MESSAGE_1) {
 			DEBUG_MESSAGE("Receive RTCP")
 			err = client.RtcpToSrtcp(buffer[:n])
 		}
@@ -186,7 +207,7 @@ func (client *WebrtcConnection) StreamController() {
 
 	}
 
-	defer DEBUG_MESSAGE("StreamController was finished")
+	defer DEBUG_MESSAGE("StreamControllerRTCP was finished")
 }
 
 func (client *WebrtcConnection) OpenConnection() error {
