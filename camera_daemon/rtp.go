@@ -10,8 +10,9 @@ import (
 )
 
 var (
-	RTP_HEADER_LEN  = 12
-	RTCP_HEADER_LEN = 8
+	RTP_HEADER_LEN         = 12
+	RTCP_HEADER_LEN        = 8
+	RTP_SSRC        uint32 = 534740855
 	//RTP_SPS         = []byte{0x67, 0x64, 0x00, 0x1e, 0xac, 0xd9, 0x40, 0xa0, 0x3d, 0xb0, 0x16, 0xa0, 0x20, 0x20, 0xa8, 0x00, 0x00, 0x03, 0x00, 0x08, 0x00, 0x00, 0x03, 0x01, 0xe4, 0x78, 0xb1, 0x6c, 0xb0}
 	//RTP_SPS = []byte{0x67, 0x64, 0x00, 0x1e, 0xac, 0xd9, 0x41, 0x41, 0xfb, 0x01, 0x6a, 0x02, 0x02, 0x0a, 0x80, 0x00, 0x00, 0x03, 0x00, 0x80, 0x00, 0x00, 0x1e, 0x47, 0x8b, 0x16, 0xcb}
 	//RTP_SPS = []byte{0x67, 0x64, 0x00, 0x0d, 0xac, 0xd9, 0x41, 0x41, 0xfb, 0x01, 0x6a, 0x02, 0x02, 0x0a, 0x80, 0x00, 0x00, 0x03, 0x00, 0x80, 0x00, 0x00, 0x1e, 0x47, 0x8a, 0x14, 0xcb}
@@ -19,6 +20,7 @@ var (
 	//RTP_SPS = []byte{0x67, 0x64, 0x00, 0x14, 0xac, 0xd9, 0x41, 0x41, 0xfb, 0x01, 0x6a, 0x02, 0x02, 0x0a, 0x80, 0x00, 0x00, 0x03, 0x00, 0x80, 0x00, 0x00, 0x1e, 0x47, 0x8a, 0x14, 0xcb}
 	//RTP_SPS = []byte{0x67, 0x64, 0x00, 0x1e, 0xac, 0xd9, 0x80, 0xa0, 0x3d, 0xb0, 0x16, 0xa0, 0x20, 0x20, 0xa8, 0x00, 0x00, 0x03, 0x00, 0x08, 0x00, 0x00, 0x03, 0x01, 0xe4, 0x78, 0xb1, 0x6c, 0xd0}
 	RTP_SPS = []byte{0x67, 0x42, 0xc0, 0x1e, 0xda, 0x02, 0x80, 0xf6, 0xc0, 0x5a, 0x80, 0x80, 0x82, 0xa0, 0x00, 0x00, 0x03, 0x00, 0x20, 0x00, 0x00, 0x07, 0x91, 0xe2, 0xc5, 0xd4}
+
 	//RTP_PPS = []byte{0x68, 0xeb, 0xec, 0xb2, 0x2c}
 	//RTP_PPS = []byte{0x68, 0xeb, 0xe3, 0xcb, 0x22, 0xc0}
 	//RTP_PPS = []byte{0x68, 0xe9, 0x7b, 0x3c, 0x8f}
@@ -343,9 +345,8 @@ func RtpIFrame(rtp []byte, sequence uint16) []byte {
 func RtpPayload(buffer []byte, sequence *uint16) (uint32, []byte, uint16) {
 	var nul_frame []byte
 	var seq_num_frame uint16 = 0
-
+	fmt.Println("Sequence: ", binary.BigEndian.Uint16(buffer[2:4]))
 	buffer[1] = (buffer[1] & 0x80) | 102 /** Change payload in rtp header */
-
 	v := (buffer[0] & 0xC0) >> 6
 	p := (buffer[0] & 0x20) >> 5
 	x := (buffer[0] & 0x10) >> 4
@@ -449,6 +450,57 @@ func (client *WebrtcConnection) RtcpToSrtcp(buffer []byte) error {
 	return nil
 }
 
+func (client *WebrtcConnection) RtpFail(buffer []byte, sequence uint16) error {
+	var hash_sha []byte
+
+	dtls_data := client.dtls_data
+	crypto_rtp := dtls_data.crypto_rtp
+	payload := buffer[RTP_HEADER_LEN:]
+	len_buffer := len(buffer)
+	crypto_buffer := make([]byte, len_buffer+SRTP_AUTH_TAG)
+
+	err := dtls_data.CheckSessionKeysRtp()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	buffer[1] = (buffer[1] & 0x80) | 102 // Change payload in rtp header
+	buffer[2] = byte((sequence & 0xFF00) >> 8)
+	buffer[3] = byte(sequence & 0xFF)                  // Don't change sequence
+	binary.BigEndian.PutUint32(buffer[8:12], RTP_SSRC) // Change ssrc for fake RTP packate
+
+	copy(crypto_buffer[:RTP_HEADER_LEN], buffer[:RTP_HEADER_LEN])
+
+	index := PacketIndex(sequence, crypto_rtp.index) // Don't change index for future packages
+
+	iv := crypto_rtp.GenerateIV(RTP_SSRC, index)
+
+	fmt.Println("Fail RTP")
+
+	DEBUG_MESSAGE_BLOCK("All message before: ", buffer)
+
+	crypto_rtp.AesCtr(iv[:], payload, crypto_buffer[RTP_HEADER_LEN:])
+
+	hash_sha, err = crypto_rtp.HmacShaRtp(crypto_buffer[:len_buffer], index)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	copy(crypto_buffer[len_buffer:], hash_sha)
+
+	DEBUG_MESSAGE_BLOCK("All message after: ", crypto_buffer)
+
+	err = client.WriteToBrowser(crypto_buffer)
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	return nil
+}
+
 func (client *WebrtcConnection) RtpToSrtp(buffer []byte, sequence *uint16) error {
 	var hash_sha []byte
 
@@ -474,7 +526,7 @@ func (client *WebrtcConnection) RtpToSrtp(buffer []byte, sequence *uint16) error
 
 		iv := crypto_rtp.GenerateIV(ssrc, crypto_rtp.index)
 
-		//fmt.Println("Len buffer: ", len_frame)
+		fmt.Println("SPS/PPS")
 
 		DEBUG_MESSAGE_BLOCK("All message SPS before: ", nul_frame)
 
@@ -503,7 +555,7 @@ func (client *WebrtcConnection) RtpToSrtp(buffer []byte, sequence *uint16) error
 
 	iv := crypto_rtp.GenerateIV(ssrc, crypto_rtp.index)
 
-	//fmt.Println("Len buffer: ", len_buffer)
+	fmt.Println("Simple RTP")
 
 	DEBUG_MESSAGE_BLOCK("All message before: ", buffer)
 

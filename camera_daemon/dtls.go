@@ -247,6 +247,5 @@ func (client *WebrtcConnection) DtlsProccess() error {
 
 	go client.StreamControllerRTP()
 	go client.StreamControllerRTCP()
-
 	return nil
 }

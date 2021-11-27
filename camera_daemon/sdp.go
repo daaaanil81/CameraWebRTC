@@ -64,7 +64,7 @@ func append_attribute_M(sdpLines *[]string, port string) {
 		ATTRIBUTE_M_RTP_SAVP + " " + ATTRIBUTE_M_PAYLOAD_102
 
 	*sdpLines = append(*sdpLines, line)
-	*sdpLines = append(*sdpLines, "b=AS:1000")
+	*sdpLines = append(*sdpLines, "b=AS:2000")
 	*sdpLines = append(*sdpLines, "b=RR:0")
 }
 

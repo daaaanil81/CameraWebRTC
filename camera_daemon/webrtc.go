@@ -84,6 +84,7 @@ type WebrtcConnection struct {
 	ice_ufrag_c   string
 	ice_pwd_s     string
 	ice_pwd_c     string
+	change_ssrc   bool
 }
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
@@ -148,7 +149,24 @@ func (client *WebrtcConnection) WriteToBrowser(buffer []byte) error {
 
 func (client *WebrtcConnection) StreamControllerRTP() {
 	var sequence uint16 = 1
+	var err error
 	buffer := make([]byte, 0x10000)
+
+	ffmpeg_connection_rtp, err = CreateConnection(PORT_RTP)
+	if err != nil {
+		fmt.Println("Error with open connection for VLC: ", err)
+		return
+	}
+
+	CloseFfmpegRTP := func() {
+		ffmpeg_mutex_rtp.Lock()
+		ffmpeg_connection_rtp.Close()
+		ffmpeg_mutex_rtp.Unlock()
+	}
+
+	defer CloseFfmpegRTP()
+
+	fmt.Println("Connection for VLC RTP")
 
 	for {
 		ffmpeg_mutex_rtp.Lock()
@@ -180,7 +198,23 @@ func (client *WebrtcConnection) StreamControllerRTP() {
 }
 
 func (client *WebrtcConnection) StreamControllerRTCP() {
+	var err error
 	buffer := make([]byte, 0x10000)
+
+	ffmpeg_connection_rtcp, err = CreateConnection(PORT_RTCP)
+	if err != nil {
+		return
+	}
+
+	CloseFfmpegRTCP := func() {
+		ffmpeg_mutex_rtcp.Lock()
+		ffmpeg_connection_rtcp.Close()
+		ffmpeg_mutex_rtcp.Unlock()
+	}
+
+	defer CloseFfmpegRTCP()
+
+	fmt.Println("Connection for VLC RTCP")
 
 	for {
 		ffmpeg_mutex_rtcp.Lock()
