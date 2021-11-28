@@ -364,10 +364,7 @@ func RtpPayload(buffer []byte, sequence *uint16) (uint32, []byte, uint16) {
 		seq_num_frame = *sequence
 		*sequence += 1
 
-		*sequence = *sequence % 0xFFFF
-		if *sequence == 0 {
-			*sequence = 1
-		}
+		*sequence = uint16(*sequence)
 	}
 
 	buffer[2] = byte((*sequence & 0xFF00) >> 8)
@@ -424,7 +421,7 @@ func (client *WebrtcConnection) RtcpToSrtcp(buffer []byte) error {
 
 	crypto_rtcp.AesCtr(iv[:], payload, crypto_buffer[RTCP_HEADER_LEN:])
 
-	fmt.Println("Length received buffer: ", len_buffer, " length crypto buffer: ", len(crypto_buffer))
+	fmt.Println("Simple RTCP")
 
 	crypto_buffer = append(crypto_buffer, make([]byte, 4)...)
 	binary.BigEndian.PutUint32(crypto_buffer[len(crypto_buffer)-4:], uint32(crypto_rtcp.index))
@@ -573,10 +570,7 @@ func (client *WebrtcConnection) RtpToSrtp(buffer []byte, sequence *uint16) error
 
 	*sequence += 1
 
-	*sequence = *sequence % 0xFFFF
-	if *sequence == 0 {
-		*sequence = 1
-	}
+	*sequence = uint16(*sequence)
 
 	err = client.WriteToBrowser(crypto_buffer)
 	if err != nil {

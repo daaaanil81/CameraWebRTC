@@ -104,9 +104,6 @@ function gotRemoteStream(e) {
         remoteVideo.srcObject = e.streams[0];
         console.log('pc2 received remote stream');
     }
-    remoteVideo.autoplay = true;
-    remoteVideo.muted = true;
-    remoteVideo.play();
 }
 
 function onError() {
