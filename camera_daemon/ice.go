@@ -85,7 +85,7 @@ func (client *WebrtcConnection) ParseICE(ice string) error {
 	}
 
 	client.port_client = arguments[5]
-	client.ice_ufrag_c = arguments[15]
+	client.ice_ufrag_c = arguments[11]
 
 	return err
 }

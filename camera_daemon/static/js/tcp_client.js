@@ -17,6 +17,7 @@ var options = {
 };
 var flag_ICE = true;
 var flag_Connection = false;
+var index = 0
 
 remoteVideo.addEventListener('loadedmetadata', function() {
     console.log(`Remote video videoWidth: ${this.videoWidth}px,  videoHeight: ${this.videoHeight}px`);
@@ -117,10 +118,11 @@ function sendIceCandidate(event) {
         console.log(event.candidate.candidate);
         var array = event.candidate.candidate.split(' ');
         var ip_address = array[4];
-        if (event.candidate.candidate.indexOf(".local", 0) == -1) {
+        if (event.candidate.candidate.indexOf("srflx", 0) == -1 && index != 1) {
             localIce = event.candidate.candidate;
             connection.send("ICE");
             connection.send(event.candidate.candidate);
+            index += 1;
         }
 
     }
