@@ -1,5 +1,5 @@
 const remoteVideo = document.getElementById('remoteVideo');
-const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+//const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 var connection;
 var localDescription;
@@ -17,7 +17,7 @@ var options = {
 };
 var flag_ICE = true;
 var flag_Connection = false;
-var index = 0
+var index = 0;
 
 remoteVideo.addEventListener('loadedmetadata', function() {
     console.log(`Remote video videoWidth: ${this.videoWidth}px,  videoHeight: ${this.videoHeight}px`);
@@ -44,7 +44,8 @@ connection.onmessage = function(event) {
     var Type = event.data.substr(0, 3);
     if (Type === 'CON') {
         console.log(event.data);
-        connectionRTC = new RTCPeerConnection(configuration);
+        //connectionRTC = new RTCPeerConnection(configuration);
+        connectionRTC = new RTCPeerConnection();
         connectionRTC.onicecandidate = sendIceCandidate;
         connectionRTC.createOffer(setLocalDescription, onError, options);
         connectionRTC.addEventListener('track', gotRemoteStream);
@@ -114,11 +115,11 @@ function onError() {
 
 function sendIceCandidate(event) {
     console.log("Local Candidate");
+    console.log(event.candidate);
     if (event.candidate) {
-        console.log(event.candidate.candidate);
-        var array = event.candidate.candidate.split(' ');
-        var ip_address = array[4];
-        if (event.candidate.candidate.indexOf("srflx", 0) == -1 && index != 1) {
+        if (event.candidate.candidate.indexOf(".local", 0) != -1 &&
+            event.candidate.candidate.indexOf("ufrag", 0) != -1 &&
+            index < 1) {
             localIce = event.candidate.candidate;
             connection.send("ICE");
             connection.send(event.candidate.candidate);
