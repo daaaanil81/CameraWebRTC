@@ -1,15 +1,5 @@
 package main
 
-/*
-#cgo LDFLAGS: -lssl -lcrypto
-
-#include <openssl/ssl.h>
-#include <openssl/x509.h>
-#include <openssl/err.h>
-
-*/
-import "C"
-
 import (
 	"bytes"
 	"crypto"
@@ -205,6 +195,7 @@ func (client *WebrtcConnection) DtlsProccess() error {
 
 	dtls_data.dtlsConn, err = dtls.Client(client.connectionUDP, config)
 	if err != nil {
+		fmt.Println("Error with DTLS Client: ", err)
 		return err
 	}
 

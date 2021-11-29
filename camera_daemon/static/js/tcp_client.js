@@ -1,5 +1,6 @@
+'use strict';
 const remoteVideo = document.getElementById('remoteVideo');
-//const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+const configuration = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 var connection;
 var localDescription;
@@ -10,6 +11,7 @@ var remoteStream;
 var sizeIce = 0;
 var index = 0;
 var flagSDP = true;
+var connectionRTC;
 var candidate_result = null;
 var options = {
     offerToReceiveAudio: false,
@@ -24,7 +26,7 @@ remoteVideo.addEventListener('loadedmetadata', function() {
 });
 
 //var connection = new WebSocket('wss://109.86.197.114:45000/ws');
-var connection = new WebSocket('wss://172.28.202.28:8080/ws');
+var connection = new WebSocket('wss://192.168.1.11:8080/ws');
 
 connection.onerror = function() {
     console.log("Connection...");
@@ -44,8 +46,8 @@ connection.onmessage = function(event) {
     var Type = event.data.substr(0, 3);
     if (Type === 'CON') {
         console.log(event.data);
-        //connectionRTC = new RTCPeerConnection(configuration);
-        connectionRTC = new RTCPeerConnection();
+        connectionRTC = new RTCPeerConnection(configuration);
+        //connectionRTC = new RTCPeerConnection();
         connectionRTC.onicecandidate = sendIceCandidate;
         connectionRTC.createOffer(setLocalDescription, onError, options);
         connectionRTC.addEventListener('track', gotRemoteStream);
@@ -55,14 +57,14 @@ connection.onmessage = function(event) {
 
     if (Type === 'SDP') {
         console.log("SDP");
-        mes = event.data.substr(3);
+        var mes = event.data.substr(3);
         var description = { type: "answer", sdp: mes };
         connectionRTC.setRemoteDescription(new RTCSessionDescription(description)).catch(onError_Valid_Description);
         remoteDescription = description;
     }
 
     if (Type === 'ICE') {
-        mes = event.data.substr(3);
+        var mes = event.data.substr(3);
         var candidate = new RTCIceCandidate({ sdpMLineIndex: 0, candidate: mes });
         remoteIces.push(candidate);
         console.log("Receive remote ice candidate");
@@ -117,8 +119,9 @@ function sendIceCandidate(event) {
     console.log("Local Candidate");
     console.log(event.candidate);
     if (event.candidate) {
-        if (event.candidate.candidate.indexOf(".local", 0) != -1 &&
+        if (event.candidate.candidate.indexOf(".local", 0) == -1 &&
             event.candidate.candidate.indexOf("ufrag", 0) != -1 &&
+	    event.candidate.candidate.indexOf("srflx", 0) == -1 &&
             index < 1) {
             localIce = event.candidate.candidate;
             connection.send("ICE");

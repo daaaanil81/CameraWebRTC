@@ -78,11 +78,7 @@ func (client *WebrtcConnection) ParseICE(ice string) error {
 
 	arguments := strings.Split(ice, " ")
 
-	if PUBLIC_MODE {
-		client.ip_client = arguments[4]
-	} else {
-		client.ip_client = client.ip_local
-	}
+	client.ip_client = arguments[4]
 
 	client.port_client = arguments[5]
 	client.ice_ufrag_c = arguments[11]
