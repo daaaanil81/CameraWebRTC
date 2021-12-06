@@ -356,7 +356,7 @@ func (client *WebrtcConnection) SendICE(ws *websocket.Conn) error {
 func (client *WebrtcConnection) MessageController(done chan bool) {
 	buffer := make([]byte, 0x10000)
 	dtls_flag := false
-
+	cycle := 0
 	for {
 		n, browserAddr, err := client.connectionUDP.ReadFromUDP(buffer)
 		if err != nil {
@@ -389,7 +389,9 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 
 			err = client.ReceiveResponse(message)
 
-			if dtls_flag == false {
+			cycle += 1
+
+			if dtls_flag == false && cycle == 3{
 				client.dtls_data.InitKeys()
 				err = client.DtlsProccess()
 				dtls_flag = true
