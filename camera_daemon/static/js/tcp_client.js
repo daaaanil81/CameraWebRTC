@@ -26,7 +26,7 @@ remoteVideo.addEventListener('loadedmetadata', function() {
 });
 
 //var connection = new WebSocket('wss://109.86.197.114:45000/ws');
-var connection = new WebSocket('wss://192.168.1.11:8080/ws');
+var connection = new WebSocket('wss://192.168.43.115:8080/ws');
 
 connection.onerror = function() {
     console.log("Connection...");

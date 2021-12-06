@@ -357,6 +357,7 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 	buffer := make([]byte, 0x10000)
 	dtls_flag := false
 	cycle := 0
+	fmt.Println("Message Controller")
 	for {
 		n, browserAddr, err := client.connectionUDP.ReadFromUDP(buffer)
 		if err != nil {
@@ -364,6 +365,7 @@ func (client *WebrtcConnection) MessageController(done chan bool) {
 
 			break
 		}
+		fmt.Println("Receive message")
 
 		message := buffer[:n]
 		if DEBUG_MODE {

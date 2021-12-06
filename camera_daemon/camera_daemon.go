@@ -134,9 +134,9 @@ func WSClient(ws *websocket.Conn) {
 	conn.connectionUDP.Close()
 
 	laddr, _ := net.ResolveUDPAddr("udp",
-		conn.ip_server+":"+conn.port_server)
+		conn.ip_server+":"+conn.port_local)
 
-	fmt.Println("Laddr: ", conn.ip_server, ":", conn.port_server)
+	fmt.Println("Laddr: ", conn.ip_server, ":", conn.port_local)
 
 	raddr, _ := net.ResolveUDPAddr("udp",
 		conn.ip_client+":"+conn.port_client)
@@ -149,6 +149,7 @@ func WSClient(ws *websocket.Conn) {
 		return
 	}
 
+	fmt.Println("Connection with browser")
 	go conn.MessageController(done)
 	<-done
 	time.Sleep(3 * time.Second)
