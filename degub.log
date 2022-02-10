@@ -1,0 +1,4 @@
+start: https://github.com/pion/srtp/blob/1e85dfb2721374c890420600bf45e7c9b54b6b54/session.go#L110
+CreateContext: https://github.com/pion/srtp/blob/1e85dfb2721374c890420600bf45e7c9b54b6b54/context.go#L65
+newSrtpCipherAesCmHmacSha1: https://github.com/pion/srtp/blob/1e85dfb2721374c890420600bf45e7c9b54b6b54/srtp_cipher_aes_cm_hmac_sha1.go#L25
+
