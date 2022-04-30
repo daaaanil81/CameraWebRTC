@@ -5,6 +5,7 @@ import (
 	"camera/logging"
 	"camera/services"
 	"camera/sessions"
+	"context"
 	"fmt"
 	"net/http"
 	"strings"
@@ -41,6 +42,14 @@ func (adaptor *serverAdaptor) ServeHTTP(writer http.ResponseWriter,
 	request *http.Request) {
 
 	adaptor.Tracef("REQ --- %v - %v", request.Method, request.URL.String())
+
+	session, _ := adaptor.Get(request, services.ServiceSessionKey)
+
+	sessionAdaptor := sessions.CreateSessionAdaptor(session)
+
+	ctx := context.WithValue(request.Context(),
+		services.ServiceSessionKey, sessionAdaptor)
+	request = request.WithContext(ctx)
 
 	switch request.Method {
 	case http.MethodGet:
