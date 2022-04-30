@@ -22,6 +22,8 @@ func (adaptor serverAdaptor) GetRequest(writer http.ResponseWriter,
 
 	path := request.URL.RequestURI()[:first]
 	switch path {
+	case "/":
+		adaptor.GetIndexTemplate(writer, request)
 	}
 }
 
