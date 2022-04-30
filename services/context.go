@@ -11,9 +11,11 @@ import (
 	"camera/sessions"
 )
 
-const serviceConfigKey = "service_config"
-const serviceLoggingKey = "service_logging"
-const serviceSessionKey = "service_session"
+const (
+	ServiceConfigKey  = "service_config"
+	ServiceLoggingKey = "service_logging"
+	ServiceSessionKey = "service_session"
+)
 
 var ctx context.Context = nil
 var once sync.Once = sync.Once{}
@@ -25,13 +27,13 @@ func NewServiceContext(configName string) {
 		if err != nil {
 			panic(fmt.Sprintf("Not found file: %v\n", configName))
 		}
-		ctx = context.WithValue(context.Background(), serviceConfigKey, cfg)
+		ctx = context.WithValue(context.Background(), ServiceConfigKey, cfg)
 
 		logger := logging.NewDefaultLogger(cfg)
-		ctx = context.WithValue(ctx, serviceLoggingKey, logger)
+		ctx = context.WithValue(ctx, ServiceLoggingKey, logger)
 
 		session_component := sessions.CreateSessionComponent(cfg)
-		ctx = context.WithValue(ctx, serviceSessionKey, session_component)
+		ctx = context.WithValue(ctx, ServiceSessionKey, session_component)
 	})
 }
 
@@ -42,11 +44,11 @@ func GetService(target interface{}) {
 	if valueTarget.Kind() == reflect.Ptr && valueTarget.Elem().CanSet() {
 		switch value := target.(type) {
 		case *logging.Logger:
-			*value, ok = ctx.Value(serviceLoggingKey).(logging.Logger)
+			*value, ok = ctx.Value(ServiceLoggingKey).(logging.Logger)
 		case *config.Configuration:
-			*value, ok = ctx.Value(serviceConfigKey).(config.Configuration)
+			*value, ok = ctx.Value(ServiceConfigKey).(config.Configuration)
 		case *sessions.SessionComponent:
-			*value, ok = ctx.Value(serviceSessionKey).(sessions.SessionComponent)
+			*value, ok = ctx.Value(ServiceSessionKey).(sessions.SessionComponent)
 		default:
 		}
 	}
