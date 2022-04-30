@@ -24,6 +24,9 @@ func (adaptor serverAdaptor) GetRequest(writer http.ResponseWriter,
 	switch path {
 	case "/":
 		adaptor.GetIndexTemplate(writer, request)
+	case "/files/":
+		fileName := request.URL.RequestURI()[first:]
+		adaptor.GetFiles(writer, request, fileName)
 	}
 }
 

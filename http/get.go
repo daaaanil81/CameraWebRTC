@@ -3,6 +3,7 @@ package http
 import (
 	"html/template"
 	"net/http"
+	"os"
 )
 
 func (adaptor serverAdaptor) GetIndexTemplate(writer http.ResponseWriter,
@@ -19,5 +20,16 @@ func (adaptor serverAdaptor) GetIndexTemplate(writer http.ResponseWriter,
 		}
 	} else {
 		adaptor.Warn(err.Error())
+	}
+}
+
+func (adaptor serverAdaptor) GetFiles(writer http.ResponseWriter,
+	request *http.Request, fileName string) {
+
+	data, err := os.ReadFile("static/" + fileName)
+	if err != nil {
+		http.NotFound(writer, request)
+	} else {
+		writer.Write(data)
 	}
 }
