@@ -8,15 +8,17 @@ import (
 
 	"camera/config"
 	"camera/logging"
+	"camera/sessions"
 )
 
 const serviceConfigKey = "service_config"
 const serviceLoggingKey = "service_logging"
+const serviceSessionKey = "service_session"
 
 var ctx context.Context = nil
+var once sync.Once = sync.Once{}
 
 func NewServiceContext(configName string) {
-	once := sync.Once{}
 
 	once.Do(func() {
 		cfg, err := config.Load(configName)
@@ -27,6 +29,9 @@ func NewServiceContext(configName string) {
 
 		logger := logging.NewDefaultLogger(cfg)
 		ctx = context.WithValue(ctx, serviceLoggingKey, logger)
+
+		session_component := sessions.CreateSessionComponent(cfg)
+		ctx = context.WithValue(ctx, serviceSessionKey, session_component)
 	})
 }
 
@@ -40,6 +45,8 @@ func GetService(target interface{}) {
 			*value, ok = ctx.Value(serviceLoggingKey).(logging.Logger)
 		case *config.Configuration:
 			*value, ok = ctx.Value(serviceConfigKey).(config.Configuration)
+		case *sessions.SessionComponent:
+			*value, ok = ctx.Value(serviceSessionKey).(sessions.SessionComponent)
 		default:
 		}
 	}

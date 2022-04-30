@@ -4,6 +4,7 @@ import (
 	"camera/config"
 	"camera/logging"
 	"camera/services"
+	"camera/sessions"
 	"fmt"
 	"net/http"
 	"strings"
@@ -13,6 +14,7 @@ import (
 type serverAdaptor struct {
 	config.Configuration
 	logging.Logger
+	sessions.SessionComponent
 }
 
 func (adaptor serverAdaptor) GetRequest(writer http.ResponseWriter,
@@ -50,15 +52,22 @@ func (adaptor serverAdaptor) ServeHTTP(writer http.ResponseWriter,
 	}
 }
 
-func Server() *sync.WaitGroup {
-	wg := sync.WaitGroup{}
+func CreateAdaptor() serverAdaptor {
 	var cfg config.Configuration
 	var logger logging.Logger
+	var component sessions.SessionComponent
 
 	services.GetService(&cfg)
 	services.GetService(&logger)
+	services.GetService(&component)
 
-	adaptor := serverAdaptor{cfg, logger}
+	return serverAdaptor{cfg, logger, component}
+}
+
+func Server() *sync.WaitGroup {
+	wg := sync.WaitGroup{}
+
+	adaptor := CreateAdaptor()
 
 	enableHttp := adaptor.GetBoolDefault("http:enableHttp", true)
 	if enableHttp {
