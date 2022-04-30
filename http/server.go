@@ -17,7 +17,7 @@ type serverAdaptor struct {
 	sessions.SessionComponent
 }
 
-func (adaptor serverAdaptor) GetRequest(writer http.ResponseWriter,
+func (adaptor *serverAdaptor) GetRequest(writer http.ResponseWriter,
 	request *http.Request) {
 
 	first := strings.Index(request.URL.RequestURI()[1:], "/") + 2
@@ -32,12 +32,12 @@ func (adaptor serverAdaptor) GetRequest(writer http.ResponseWriter,
 	}
 }
 
-func (adaptor serverAdaptor) PostRequest(writer http.ResponseWriter,
+func (adaptor *serverAdaptor) PostRequest(writer http.ResponseWriter,
 	request *http.Request) {
 
 }
 
-func (adaptor serverAdaptor) ServeHTTP(writer http.ResponseWriter,
+func (adaptor *serverAdaptor) ServeHTTP(writer http.ResponseWriter,
 	request *http.Request) {
 
 	adaptor.Tracef("REQ --- %v - %v", request.Method, request.URL.String())
@@ -52,16 +52,14 @@ func (adaptor serverAdaptor) ServeHTTP(writer http.ResponseWriter,
 	}
 }
 
-func CreateAdaptor() serverAdaptor {
-	var cfg config.Configuration
-	var logger logging.Logger
-	var component sessions.SessionComponent
+func CreateAdaptor() *serverAdaptor {
+	adaptor := serverAdaptor{}
 
-	services.GetService(&cfg)
-	services.GetService(&logger)
-	services.GetService(&component)
+	services.GetService(&adaptor.Configuration)
+	services.GetService(&adaptor.Logger)
+	services.GetService(&adaptor.SessionComponent)
 
-	return serverAdaptor{cfg, logger, component}
+	return &adaptor
 }
 
 func Server() *sync.WaitGroup {
