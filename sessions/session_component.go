@@ -30,7 +30,7 @@ func CreateSessionComponent(cfg config.Configuration) (component SessionComponen
 	}
 
 	if cfg.GetBoolDefault("session:cyclekey", true) {
-		io.WriteString(h, time.Now().String())
+		io.WriteString(hash, time.Now().String())
 	}
 
 	component.store = gorilla.NewCookieStore(hash.Sum(nil))
