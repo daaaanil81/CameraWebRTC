@@ -1,6 +1,8 @@
 package http
 
 import (
+	"camera/authorization"
+	"camera/authorization/identity"
 	"camera/config"
 	"camera/logging"
 	"camera/services"
@@ -16,6 +18,11 @@ type serverAdaptor struct {
 	config.Configuration
 	logging.Logger
 	sessions.SessionComponent
+
+	identity.AuthorizationCondition
+	identity.UserStore
+
+	identity.User
 }
 
 func (adaptor *serverAdaptor) GetRequest(writer http.ResponseWriter,
@@ -43,13 +50,22 @@ func (adaptor *serverAdaptor) ServeHTTP(writer http.ResponseWriter,
 
 	adaptor.Tracef("REQ --- %v - %v", request.Method, request.URL.String())
 
-	session, _ := adaptor.Get(request, services.ServiceSessionKey)
-
+	session, _ := adaptor.Get(request, sessions.ServiceSessionKey)
 	sessionAdaptor := sessions.CreateSessionAdaptor(session)
 
 	ctx := context.WithValue(request.Context(),
-		services.ServiceSessionKey, sessionAdaptor)
+		sessions.ServiceSessionKey, sessionAdaptor)
 	request = request.WithContext(ctx)
+
+	signMgr := authorization.SessionSignInMgr{
+		Request: request,
+		Writer:  writer,
+	}
+
+	id, _ := signMgr.Check()
+	if id == authorization.UKNOWN_USER {
+
+	}
 
 	switch request.Method {
 	case http.MethodGet:
@@ -67,6 +83,9 @@ func CreateAdaptor() *serverAdaptor {
 	services.GetService(&adaptor.Configuration)
 	services.GetService(&adaptor.Logger)
 	services.GetService(&adaptor.SessionComponent)
+
+	services.GetService(&adaptor.AuthorizationCondition)
+	services.GetService(&adaptor.UserStore)
 
 	return &adaptor
 }

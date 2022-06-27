@@ -1,9 +1,18 @@
 {
     "logging": {
-        "level": "debug"
+        "level": "trace"
     },
 
     "main": {
         "message": "Hello from the config file"
+    },
+
+    "sessions": {
+        "key": "hello",
+        "cyclekey": true
+    },
+
+    "users": {
+        "roles": ["Administrator", "User"]
     }
 }

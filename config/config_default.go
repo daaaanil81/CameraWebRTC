@@ -30,6 +30,21 @@ func (c *DefaultConfig) GetSection(sectionName string) (section Configuration, f
 	return
 }
 
+func (c *DefaultConfig) GetStringSlice(name string) (configValue []string,
+	found bool) {
+
+	value, found := c.get(name)
+	if found {
+		if arr, ok := value.([]interface{}); ok {
+			configValue = make([]string, len(arr))
+			for i, elem := range arr {
+				configValue[i] = elem.(string)
+			}
+		}
+	}
+	return
+}
+
 func (c *DefaultConfig) GetString(name string) (configValue string, found bool) {
 	value, found := c.get(name)
 	if found {

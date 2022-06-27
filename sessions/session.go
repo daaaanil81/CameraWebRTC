@@ -6,6 +6,8 @@ import (
 	gorilla "github.com/gorilla/sessions"
 )
 
+const ServiceSessionKey = "service_session"
+
 type Session interface {
 	GetValue(key string) interface{}
 	GetValueDefault(key string, defVal interface{}) interface{}
